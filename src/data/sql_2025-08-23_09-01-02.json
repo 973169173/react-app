@@ -1,0 +1,7 @@
+{
+  "query": "SELECT * FROM documents WHERE category = \"research\"",
+  "description": "Enter description",
+  "model": "gpt-4o",
+  "result": "{\"columns\":[\"doc\",\"age\",\"name\",\"_source_age\",\"_source_name\"],\"data\":[[\"Aaron_Williams.txt\",\"30\",\"Aaron Williams\",\"Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.\",\"In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).\"],[\"1111111\",\"12\",\"121\",\"121\",\"111\"],[\"222222222\",\"212\",\"121\",\"121\",\"111\"]],\"index\":[0,1,2]}",
+  "timestamp": "2025-08-23T09:01:02.083Z"
+}

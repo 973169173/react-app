@@ -1,0 +1,41 @@
+{
+  "operators": [
+    {
+      "collapsed": false,
+      "id": "1",
+      "model": "gpt-4o",
+      "name": "test_1",
+      "output": null,
+      "parameters": {},
+      "prompt": "Enter Prompt",
+      "status": "enabled",
+      "type": "extract"
+    },
+    {
+      "collapsed": false,
+      "id": "2",
+      "model": "gpt-4o",
+      "name": "test_2",
+      "output": null,
+      "parameters": {},
+      "prompt": "Enter Prompt",
+      "status": "pending",
+      "type": "filter"
+    }
+  ],
+  "documents": [
+    {
+      "id": 8202077722218328000,
+      "name": "Aaron_Williams.txt"
+    },
+    {
+      "id": 4177760929148873700,
+      "name": "Andre_Drummond.txt"
+    },
+    {
+      "id": 4687920043206982000,
+      "name": "Angelo_Russell.txt"
+    }
+  ],
+  "timestamp": "2025-08-23T06:54:59.000Z"
+}

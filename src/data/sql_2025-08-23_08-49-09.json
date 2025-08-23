@@ -1,0 +1,6 @@
+{
+  "query": "SELECT * FROM documents WHERE category = \"research\"啊大苏打撒",
+  "description": "Enter description实打实大苏打",
+  "model": "claude",
+  "timestamp": "2025-08-23T08:49:09.118Z"
+}
