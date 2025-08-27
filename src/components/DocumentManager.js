@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, Typography, Upload, message, Modal } from 'antd';
+import { Card, Button, Space, Typography, Upload, message, Modal, Input, List } from 'antd';
 import { 
   UploadOutlined, 
   EyeOutlined, 
   DeleteOutlined, 
   DownloadOutlined,
   FileTextOutlined,
-  FilePdfOutlined 
+  FilePdfOutlined,
+  BuildOutlined
 } from '@ant-design/icons';
 
 const { Text, Paragraph } = Typography;
@@ -18,6 +19,10 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const [uploading, setUploading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [highlightText, setHighlightText] = useState(null);
+  const [buildIndexModalVisible, setBuildIndexModalVisible] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [buildingIndex, setBuildingIndex] = useState(false);
+  const [indexName, setIndexName] = useState('');
 
   // 组件加载时从服务器获取文档列表
   useEffect(() => {
@@ -238,11 +243,67 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     setExpandedDocIds(prev => prev.filter(id => id !== docId));
   };
 
+  // 处理构建索引
+  const handleBuildIndex = () => {
+    setBuildIndexModalVisible(true);
+    setSelectedDocuments([]);
+    setIndexName('');
+  };
+
+  // 执行构建索引
+  const executeBuildIndex = async () => {
+    if (selectedDocuments.length === 0) {
+      message.warning('Please select at least one document');
+      return;
+    }
+
+    if (!indexName.trim()) {
+      message.warning('Please enter an index name');
+      return;
+    }
+
+    try {
+      setBuildingIndex(true);
+      const response = await fetch('http://localhost:5000/api/build-index', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documents: selectedDocuments,
+          indexName: indexName.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      message.success(`Index "${indexName}" built successfully!`);
+      setBuildIndexModalVisible(false);
+      setSelectedDocuments([]);
+      setIndexName('');
+    } catch (error) {
+      console.error('构建索引失败:', error);
+      message.error('Failed to build index: ' + error.message);
+    } finally {
+      setBuildingIndex(false);
+    }
+  };
+
   return (
     <div className="document-manager">
       <div className="documents-header">
         <Typography.Title level={4}>Documents</Typography.Title>
         <Space>
+          <Button 
+            size="small" 
+            icon={<BuildOutlined />}
+            onClick={handleBuildIndex}
+          >
+            Build Index
+          </Button>
           <Upload {...uploadProps}>
             <Button size="small" icon={<UploadOutlined />} loading={uploading}>
               {uploading ? 'Uploading...' : 'Upload'}
@@ -368,6 +429,91 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
                 (previewDocument.content || '无法显示文件内容')
               }
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 构建索引模态框 */}
+      <Modal
+        title="Build Index"
+        open={buildIndexModalVisible}
+        onCancel={() => setBuildIndexModalVisible(false)}
+        onOk={executeBuildIndex}
+        okText="Build Index"
+        cancelText="Cancel"
+        confirmLoading={buildingIndex}
+        width={600}
+      >
+        <div style={{ marginBottom: '16px' }}>
+          <Typography.Text>
+            Create an index for faster search and processing:
+          </Typography.Text>
+        </div>
+
+        {/* 索引名称输入框 */}
+        <div style={{ marginBottom: '16px' }}>
+          <Typography.Text strong>Index Name:</Typography.Text>
+          <Input
+            value={indexName}
+            onChange={(e) => setIndexName(e.target.value)}
+            placeholder="Enter index name (e.g., document_index_2025)"
+            style={{ marginTop: '4px' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <Typography.Text strong>Select Documents:</Typography.Text>
+        </div>
+        
+        <List
+          dataSource={documents}
+          renderItem={(document) => (
+            <List.Item>
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedDocuments.includes(document.name)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedDocuments([...selectedDocuments, document.name]);
+                    } else {
+                      setSelectedDocuments(selectedDocuments.filter(name => name !== document.name));
+                    }
+                  }}
+                  style={{ marginRight: '12px' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <Typography.Text strong>{document.name}</Typography.Text>
+                  <br />
+                  <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                    Size: {document.size || 'Unknown'} | Type: {document.type || 'Unknown'}
+                  </Typography.Text>
+                </div>
+              </div>
+            </List.Item>
+          )}
+          locale={{ emptyText: 'No documents available' }}
+        />
+        
+        {documents.length > 0 && (
+          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '6px' }}>
+            <Space>
+              <Button 
+                size="small" 
+                onClick={() => setSelectedDocuments(documents.map(doc => doc.name))}
+              >
+                Select All
+              </Button>
+              <Button 
+                size="small" 
+                onClick={() => setSelectedDocuments([])}
+              >
+                Clear All
+              </Button>
+              <Typography.Text type="secondary">
+                Selected: {selectedDocuments.length} / {documents.length}
+              </Typography.Text>
+            </Space>
           </div>
         )}
       </Modal>

@@ -8,7 +8,7 @@ import {
   MessageOutlined
 } from '@ant-design/icons';
 import DocumentManager from './DocumentManager';
-import OperatorPanel from './OperatorPanel';
+import ProjectPage from '../pages/ProjectPage';
 import SQLPanel from '../pages/SQLPage';
 import NaturalLanguagePanel from '../pages/NaturalLanguagePage';
 import './PromptStudio.css';
@@ -135,13 +135,13 @@ const PromptStudio = () => {
   const renderMainContent = () => {
     switch (currentPage) {
       case 'operators':
-        return <OperatorPanel documents={documents} onRowClick={handleRowClick} />;
+        return <ProjectPage documents={documents} onRowClick={handleRowClick} />;
       case 'sql':
         return <SQLPanel documents={documents} onRowClick={handleRowClick} />;
       case 'natural-language':
         return <NaturalLanguagePanel documents={documents} onRowClick={handleRowClick} />;
       default:
-        return <OperatorPanel documents={documents} onRowClick={handleRowClick} />;
+        return <ProjectPage documents={documents} onRowClick={handleRowClick} />;
     }
   };
 

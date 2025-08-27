@@ -8,7 +8,8 @@ import {
   DeleteOutlined,
   CopyOutlined,
   SaveOutlined,
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  BuildOutlined
 } from '@ant-design/icons';
 import {
   DndContext,
@@ -400,7 +401,7 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
   );
 };
 
-const OperatorPanel = ({ documents, onRowClick }) => {
+const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackToProjects, projectInfo }) => {
   const { message } = App.useApp();
   
   const [operators, setOperators] = useState([
@@ -507,7 +508,8 @@ const OperatorPanel = ({ documents, onRowClick }) => {
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {}
+            parameters: operator.parameters || {},
+            function_name: projectInfo?.function_name || null
           })
         });
       }
@@ -521,20 +523,39 @@ const OperatorPanel = ({ documents, onRowClick }) => {
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {}
+            parameters: operator.parameters || {},
+            function_name: projectInfo?.function_name || null
           })
         });
       }
-      
- 
-      
+      else if (operator.type ==='Retrieve') {
+        response = await fetch('http://localhost:5000/api/retrieve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            type: operator.type,
+            prompt: operator.prompt,
+            model: operator.model,
+            parameters: operator.parameters || {},
+            function_name: projectInfo?.function_name || null
+          })
+        });
+      }
+
+
+
+
+
       const data = await response.json(); // 解析 JSON 数据
-      
+      projectInfo.function_name = data.function_name;
+      console.log(projectInfo)
       setOperators(prev => prev.map(op => 
         op.id === id ? { 
           ...op, 
           status: 'enabled',
-          output: JSON.stringify(data) // 将数据转为字符串存储
+          output: JSON.stringify(data.table) // 将数据转为字符串存储
           
         } : op
       ));
@@ -630,7 +651,8 @@ const OperatorPanel = ({ documents, onRowClick }) => {
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {}
+            parameters: operator.parameters || {},
+            function_name: projectInfo?.function_name || null
           })
         });
       }
@@ -644,7 +666,8 @@ const OperatorPanel = ({ documents, onRowClick }) => {
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {}
+            parameters: operator.parameters || {},
+            function_name: projectInfo?.function_name || null
           })
         });
       }
@@ -737,7 +760,22 @@ const OperatorPanel = ({ documents, onRowClick }) => {
     <div className="operators-section">
       <div className="operators-header">
         <div>
-          <Title level={4}>Document Operator</Title>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {showBackButton && (
+              <Button 
+                type="text" 
+                size="small"
+                onClick={onBackToProjects}
+                style={{ padding: '4px 8px', fontSize: '12px' }}
+              >
+                ← Projects
+              </Button>
+            )}
+            <Title level={4} style={{ margin: 0 }}>
+              {projectInfo ? `Document Operator - ${projectInfo.name}` : 'Document Operator'}
+            </Title>
+
+          </div>
           <div className="workflow-status" style={{ marginBottom: '16px' }}>
             <Space size="large">
               <Badge status="success" text={`${operators.filter(op => op.status === 'enabled').length} Completed`} />

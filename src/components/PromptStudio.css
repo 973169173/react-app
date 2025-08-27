@@ -20,6 +20,26 @@
   background: #f0f2f5;
 }
 
+/* Project Page Styles */
+.project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.project-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.project-status-badge {
+  transition: all 0.2s ease;
+}
+
+.project-status-badge:hover {
+  transform: scale(1.05);
+}
+
 .content-wrapper {
   display: flex;
   height: 100vh;

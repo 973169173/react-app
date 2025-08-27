@@ -1,3 +1,7 @@
+import sys
+sys.path.append('/home/lijianhui/workspace/quest')
+
+
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os
@@ -24,35 +28,48 @@ if not os.path.exists(UPLOAD_FOLDER):
 if not os.path.exists(DATA_FOLDER):
     os.makedirs(DATA_FOLDER)
 
+from quest.backend.interface.operation import OperationImplementation
+
+fun = OperationImplementation()
+
+
 @app.route('/api/extract', methods=['POST'])
 def extract_data():
     #time.sleep(10)
     print(request.json)
-    type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
+    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
     print(type,prompt,model,parameters);
-    foname='111'
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
-    }
-    df=pd.DataFrame(data)
-    return jsonify({    'table':df.to_dict(orient="split"),'function_name':foname})
+    fo_name=fun.extract_text(foname,tablename,columnname)
+    df=fun.show_table_with_source(fo_name,tablename)
+    return jsonify({
+        'function_name':fo_name,
+        'table':df.to_dict(orient="split")})
     
 
 @app.route('/api/filter', methods=['POST'])
 def filter():
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
-    }
-    df=pd.DataFrame(data)
-    return jsonify(df.to_dict(orient="split"))
+    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
+    print(type,prompt,model,parameters);
+    fo_name=fun.extract_text(foname,tablename,columnname)
+    df=fun.show_table_with_source(fo_name,tablename)
+    return jsonify({
+        'function_name':fo_name,
+        'table':df.to_dict(orient="split")})
+
+@app.route('/api/retrieve', methods=['POST'])
+def filter():
+    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
+    print(type,prompt,model,parameters);
+    fo_name=fun.retrieve_text(foname,tablename,columnname)
+    df=fun.show_table_with_source(fo_name,tablename)
+    return jsonify({
+        'function_name':fo_name,
+        'table':df.to_dict(orient="split")})
+
+
 
 @app.route('/api/nl',methods=['POST'])
 def nl():
@@ -90,10 +107,10 @@ def build_index():
         if not request_data:
             return jsonify({'error': 'No request data provided'}), 400
             
-        # 支持两种字段名：documents 或 documentIds
+
         document_names = request_data.get('documents', [])
-        
-        
+        tabel_name = request_data.get('table_name',[])
+        fun.build_index(document_names,tabel_name)
 
         
         # 返回成功结果
@@ -117,8 +134,16 @@ def create_project():
         project_data = request.json
         if not project_data:
             return jsonify({'error': '无效的项目数据'}), 400
-        
+        indexname=project_data.get('index_name','')
+        foname=fun.create_funObject(indexname)
 
+        # 返回成功结果
+        result = {
+            'function_name': foname,
+            'status': 'active'
+        }
+        
+        return jsonify(result)
         
     except Exception as e:
         return jsonify({'error': f'创建项目失败: {str(e)}'}), 500
