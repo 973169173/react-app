@@ -110,7 +110,9 @@ def build_index():
 
         document_names = request_data.get('documents', "")
         tabel_name = request_data.get('indexName',"")
-        fun.build_indexer(["/home/lijianhui/workspace/react-app/src/files"], [tabel_name], ['TextDoc'])
+        base_path = "/home/lijianhui/workspace/react-app/src/files"
+        full_paths = [os.path.join(base_path, name) for name in document_names]
+        fun.build_indexer(full_paths, [tabel_name], ['TextDoc'])
 
         
         # 返回成功结果
