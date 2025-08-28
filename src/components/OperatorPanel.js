@@ -9,7 +9,7 @@ import {
   CopyOutlined,
   SaveOutlined,
   FolderOpenOutlined,
-  BuildOutlined
+
 } from '@ant-design/icons';
 import {
   DndContext,
@@ -40,16 +40,16 @@ const { Title, Text } = Typography;
 const OPERATOR_PARAMETERS = {
   extract: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
-    { key: 'columnname', label: 'Column Name', type: 'input', placeholder: 'columnname' }
+    { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' }
   ],
   filter: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
-    { key: 'columnname', label: 'Column Name', type: 'input', placeholder: 'columnname' },
+    { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' },
     { key: 'condition', label: 'Filter Condition', type: 'input' ,placeholder:'condition'},
   ],
   Retrieve: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
-    { key: 'columnname', label: 'Column Name', type: 'input', placeholder: 'columnname' },
+    { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' },
   ],
   Aggregation: [
     { key: 'function', label: 'Aggregation Function', type: 'select', options: ['sum', 'avg', 'count', 'max', 'min'], placeholder: 'Select function' },
@@ -73,6 +73,72 @@ const OPERATOR_PARAMETERS = {
   ]
 };
 
+// 列名输入组件
+const ColumnInput = ({ value = [], onChange }) => {
+  const handleAddColumn = () => {
+    const newColumn = { columnname: '', description: '' };
+    onChange([...value, newColumn]);
+  };
+
+  const handleRemoveColumn = (index) => {
+    const newColumns = value.filter((_, i) => i !== index);
+    onChange(newColumns);
+  };
+
+  const handleColumnChange = (index, field, newValue) => {
+    const newColumns = value.map((col, i) => 
+      i === index ? { ...col, [field]: newValue } : col
+    );
+    onChange(newColumns);
+  };
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      {value.map((column, index) => (
+        <div key={index} style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          marginBottom: '8px', 
+          alignItems: 'center' 
+        }}>
+          <Input
+            placeholder="Column Name"
+            value={column.columnname}
+            onChange={(e) => handleColumnChange(index, 'columnname', e.target.value)}
+            style={{ flex: 1 }}
+            size="small"
+          />
+          <Input
+            placeholder="Description"
+            value={column.description}
+            onChange={(e) => handleColumnChange(index, 'description', e.target.value)}
+            style={{ flex: 1 }}
+            size="small"
+          />
+          <Button
+            type="text"
+            size="small"
+            danger
+            onClick={() => handleRemoveColumn(index)}
+            style={{ minWidth: '24px', padding: '0 4px' }}
+          >
+            ×
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="dashed"
+        size="small"
+        icon={<PlusOutlined />}
+        onClick={handleAddColumn}
+        style={{ width: '100%' }}
+      >
+        Add Column
+      </Button>
+    </div>
+  );
+};
+
 // 参数输入组件
 const ParameterInput = ({ parameter, value, onChange }) => {
   const handleChange = (newValue) => {
@@ -80,6 +146,13 @@ const ParameterInput = ({ parameter, value, onChange }) => {
   };
 
   switch (parameter.type) {
+    case 'columns':
+      return (
+        <ColumnInput
+          value={value || []}
+          onChange={handleChange}
+        />
+      );
     case 'select':
       return (
         <Select
@@ -295,7 +368,7 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
             </div>
           )}
 
-          <div>
+          {/* <div>
             <Text strong>Prompt:</Text>
             <TextArea
               value={operator.prompt}
@@ -304,7 +377,7 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
               rows={1}
               style={{ marginTop: 4 }}
             />
-          </div>
+          </div> */}
 
           <div>
             <Text strong>Model:</Text>
@@ -409,7 +482,6 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       id: '1',
       name: 'test_1',
       type: 'extract',
-      prompt: 'Enter Prompt',
       model: 'gpt-4o',
       status: 'enabled',
       output: null,
@@ -422,24 +494,24 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   const [savedWorkflows, setSavedWorkflows] = useState([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
 
-  // 页面加载时自动获取最新的workflow
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('http://localhost:5000/api/workflow/latest');
-        if (res.ok) {
-          const saved = await res.json();
-          if (saved?.version === 1 && Array.isArray(saved.operators)) {
-            setOperators(saved.operators);
-            return; // 成功就不再读 localStorage
-          }
-        }
-      } catch (error) {
-        console.error('获取最新workflow失败:', error);
-        // 如果获取失败，保持默认的operators
-      }
-    })();
-  }, []);
+  // // 页面加载时自动获取最新的workflow
+  // useEffect(() => {
+  //   (async () => {
+  //     try {
+  //       const res = await fetch('http://localhost:5000/api/workflow/latest');
+  //       if (res.ok) {
+  //         const saved = await res.json();
+  //         if (saved?.version === 1 && Array.isArray(saved.operators)) {
+  //           setOperators(saved.operators);
+  //           return; // 成功就不再读 localStorage
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error('获取最新workflow失败:', error);
+  //       // 如果获取失败，保持默认的operators
+  //     }
+  //   })();
+  // }, []);
   const [savingWorkflow, setSavingWorkflow] = useState(false);
 
   const sensors = useSensors(
@@ -498,6 +570,28 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     const operator = operators.find(op => op.id === id);
     let response
     try {
+      // 处理columns参数，生成column_name列表和描述信息
+      const processedParameters = { ...operator.parameters };
+      if (operator.parameters?.columns && Array.isArray(operator.parameters.columns)) {
+        // 生成column_name列表
+        processedParameters.column_name = operator.parameters.columns
+          .filter(col => col.columnname && col.columnname.trim())
+          .map(col => col.columnname.trim());
+        
+        // 生成包含描述的prompt字符串
+        const columnDescriptions = operator.parameters.columns
+          .filter(col => col.columnname && col.columnname.trim())
+          .map(col => `${col.columnname.trim()}${col.description ? ':' + col.description.trim() : ''}`)
+          .join(', ');
+        
+        if (columnDescriptions) {
+          processedParameters.columns_prompt = columnDescriptions;
+        }
+        
+        // 移除原始的columns数组，避免发送给后端
+        delete processedParameters.columns;
+      }
+
       if (operator.type === 'extract') {
         response = await fetch('http://localhost:5000/api/extract', {
           method: 'POST',
@@ -508,7 +602,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {},
+            parameters: processedParameters,
             function_name: projectInfo?.function_name || null
           })
         });
@@ -523,7 +617,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {},
+            parameters: processedParameters,
             function_name: projectInfo?.function_name || null
           })
         });
@@ -538,7 +632,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {},
+            parameters: processedParameters,
             function_name: projectInfo?.function_name || null
           })
         });
@@ -641,6 +735,29 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     // 依次运行所有算子
     pendingOperators.forEach(async (operator, index) => {
       let response;
+      
+      // 处理columns参数，生成column_name列表和描述信息
+      const processedParameters = { ...operator.parameters };
+      if (operator.parameters?.columns && Array.isArray(operator.parameters.columns)) {
+        // 生成column_name列表
+        processedParameters.column_name = operator.parameters.columns
+          .filter(col => col.columnname && col.columnname.trim())
+          .map(col => col.columnname.trim());
+        
+        // 生成包含描述的prompt字符串
+        const columnDescriptions = operator.parameters.columns
+          .filter(col => col.columnname && col.columnname.trim())
+          .map(col => `${col.columnname.trim()}${col.description ? ':' + col.description.trim() : ''}`)
+          .join(', ');
+        
+        if (columnDescriptions) {
+          processedParameters.columns_prompt = columnDescriptions;
+        }
+        
+        // 移除原始的columns数组，避免发送给后端
+        delete processedParameters.columns;
+      }
+      
       if (operator.type === 'extract') {
         response = await fetch('http://localhost:5000/api/extract', {
           method: 'POST',
@@ -651,7 +768,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: operator.parameters || {},
+            parameters: processedParameters,
             function_name: projectInfo?.function_name || null
           })
         });

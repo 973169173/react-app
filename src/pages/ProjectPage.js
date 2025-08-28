@@ -174,11 +174,11 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
                 ]}
                 style={{ height: '200px' }}
               >
-                <div style={{ height: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                      <FolderOutlined style={{ fontSize: '20px', marginRight: '8px', color: '#1890ff' }} />
-                      <Title level={4} style={{ margin: 0 }}>
+                      <FolderOutlined style={{ fontSize: '25px', marginRight: '8px', color: '#1890ff' }} />
+                      <Title level={5} style={{ margin: 0 }}>
                         {project.name}
                       </Title>
                     </div>

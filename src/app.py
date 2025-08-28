@@ -117,7 +117,12 @@ def create_project():
         project_data = request.json
         if not project_data:
             return jsonify({'error': '无效的项目数据'}), 400
+        result = {
+            'function_name': '111',
+            'status': 'active'
+        }
         
+        return jsonify(result)
 
         
     except Exception as e:

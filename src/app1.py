@@ -38,7 +38,7 @@ def extract_data():
     #time.sleep(10)
     print(request.json)
     type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
-    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
+    tablename,columnname=parameters.get('tablename',''),parameters.get('column_name','')
     print(type,prompt,model,parameters);
     fo_name=fun.extract_text(foname,tablename,columnname)
     df=fun.show_table_with_source(fo_name,tablename)
@@ -50,7 +50,7 @@ def extract_data():
 @app.route('/api/filter', methods=['POST'])
 def filter():
     type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
-    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
+    tablename,columnname=parameters.get('tablename',''),parameters.get('column_name','')
     print(type,prompt,model,parameters);
     fo_name=fun.extract_text(foname,tablename,columnname)
     df=fun.show_table_with_source(fo_name,tablename)
@@ -60,10 +60,10 @@ def filter():
 
 @app.route('/api/retrieve', methods=['POST'])
 def filter():
-    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
-    tablename,columnname=parameters.get('table_name',''),parameters.get('column_name','')
+    type,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+    tablename,columnname,prompt =parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
     print(type,prompt,model,parameters);
-    fo_name=fun.retrieve_text(foname,tablename,columnname)
+    fo_name=fun.retrieve_text(foname,tablename,columnname,prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
@@ -108,9 +108,9 @@ def build_index():
             return jsonify({'error': 'No request data provided'}), 400
             
 
-        document_names = request_data.get('documents', [])
-        tabel_name = request_data.get('table_name',[])
-        fun.build_index(document_names,tabel_name)
+        document_names = request_data.get('documents', "")
+        tabel_name = request_data.get('indexName',"")
+        fun.build_indexer(["/home/lijianhui/workspace/react-app/src/files"], [tabel_name], ['TextDoc'])
 
         
         # 返回成功结果
@@ -135,7 +135,7 @@ def create_project():
         if not project_data:
             return jsonify({'error': '无效的项目数据'}), 400
         indexname=project_data.get('index_name','')
-        foname=fun.create_funObject(indexname)
+        foname=fun.create_funcObject([indexname])
 
         # 返回成功结果
         result = {
