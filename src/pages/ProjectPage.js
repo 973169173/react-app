@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Card, Button, List, Typography, Space, Input, Modal, Form, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Button, List, Typography, Space, Input, Modal, Form, message, Select } from 'antd';
 import { PlusOutlined, FolderOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons';
 import OperatorPanel from '../components/OperatorPanel';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
+const { Option } = Select;
 
 const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
   const [currentView, setCurrentView] = useState('projects'); // 'projects' or 'operators'
@@ -34,6 +35,31 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
   ]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [indexOptions, setIndexOptions] = useState([]);
+  const [loadingIndexes, setLoadingIndexes] = useState(false);
+
+  // 获取索引列表
+  const fetchIndexes = async () => {
+    setLoadingIndexes(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/indexes');
+      if (!response.ok) {
+        throw new Error('Failed to fetch indexes');
+      }
+      const data = await response.json();
+      setIndexOptions(data.indexes || []);
+    } catch (error) {
+      console.error('Failed to fetch indexes:', error);
+      message.error('Failed to load index options');
+    } finally {
+      setLoadingIndexes(false);
+    }
+  };
+
+  // 组件挂载时获取索引列表
+  useEffect(() => {
+    fetchIndexes();
+  }, []);
 
   const handleProjectClick = (project) => {
     setSelectedProject(project);
@@ -47,6 +73,8 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
 
   const handleCreateProject = () => {
     setIsModalVisible(true);
+    // 打开模态框时重新获取索引列表
+    fetchIndexes();
   };
 
   const handleModalOk = async () => {
@@ -238,7 +266,21 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
             label="Index Name"
             rules={[{ required: false }]}
           >
-            <Input placeholder="Enter index name (optional)" />
+            <Select 
+              placeholder="Select an index (optional)"
+              allowClear
+              loading={loadingIndexes}
+              showSearch
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+            >
+              {indexOptions.map(index => (
+                <Option key={index.id} value={index.id}>
+                  {index.name}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

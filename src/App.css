@@ -17,3 +17,107 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* 文件夹管理器样式 */
+.document-manager {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.document-manager .documents-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+.document-manager .documents-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  min-height: 400px;
+  max-height: calc(100vh - 200px);
+}
+
+.document-manager .documents-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.document-manager .documents-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.document-manager .documents-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.document-manager .documents-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.document-manager .folder-container {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: visible;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.document-manager .folder-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+.document-manager .folder-header {
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 3;
+}
+
+.document-manager .folder-header:hover {
+  background-color: #e6f7ff !important;
+}
+
+.document-manager .folder-content {
+  border-top: 1px solid #f0f0f0;
+  padding: 12px;
+  background-color: #fafafa;
+  position: relative;
+  z-index: 2;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.document-manager .document-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.document-manager .document-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: #1890ff;
+  transform: translateY(-1px);
+}

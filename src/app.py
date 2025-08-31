@@ -128,6 +128,108 @@ def create_project():
     except Exception as e:
         return jsonify({'error': f'创建项目失败: {str(e)}'}), 500
 
+@app.route('/api/indexes', methods=['GET'])
+def get_indexes():
+    """获取可用的索引列表"""
+    try:
+        # 这里模拟一些索引数据，实际项目中应该从数据库或配置文件获取
+        indexes = [
+            {
+                'id': 'idx_documents_001',
+                'name': 'Document Index 001',
+                'description': 'General document index'
+            },
+            {
+                'id': 'idx_knowledge_base',
+                'name': 'Knowledge Base Index',
+                'description': 'Knowledge base document index'
+            },
+            {
+                'id': 'idx_research_papers',
+                'name': 'Research Papers Index',
+                'description': 'Academic research papers index'
+            },
+            {
+                'id': 'idx_user_manuals',
+                'name': 'User Manuals Index',
+                'description': 'Product user manuals index'
+            },
+            {
+                'id': 'idx_legal_docs',
+                'name': 'Legal Documents Index',
+                'description': 'Legal documents and contracts index'
+            }
+        ]
+        
+        return jsonify({
+            'indexes': indexes,
+            'total': len(indexes)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'获取索引列表失败: {str(e)}'}), 500
+    
+
+
+@app.route('/api/existindex', methods=['GET'])
+def get_existindexes():
+    """获取可用的索引列表"""
+    try:
+        # 这里模拟一些索引数据，实际项目中应该从数据库或配置文件获取
+        indexes = [
+            {
+                'id': 'idx_documents_001',
+                'name': 'Document Index 001',
+                'description': 'General document index'
+            },
+            {
+                'id': 'idx_knowledge_base',
+                'name': 'Knowledge Base Index',
+                'description': 'Knowledge base document index'
+            },
+            {
+                'id': 'idx_research_papers',
+                'name': 'Research Papers Index',
+                'description': 'Academic research papers index'
+            },
+            {
+                'id': 'idx_user_manuals',
+                'name': 'User Manuals Index',
+                'description': 'Product user manuals index'
+            },
+            {
+                'id': 'idx_legal_docs',
+                'name': 'Legal Documents Index',
+                'description': 'Legal documents and contracts index'
+            }
+        ]
+        
+        return jsonify({
+            'indexes': indexes,
+            'total': len(indexes)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'获取索引列表失败: {str(e)}'}), 500
+
+@app.route('/api/save-index-selection', methods=['POST'])
+def save_index_selection():
+    """保存索引选择"""
+    try:
+        data = request.json
+        selected_indexes = data.get('selected_indexes', [])
+        
+        # 这里可以保存到数据库或文件
+        # 现在只是返回成功消息
+        
+        return jsonify({
+            'message': 'Index selection saved successfully',
+            'selected_count': len(selected_indexes)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'保存索引选择失败: {str(e)}'}), 500
+
 
 
 
@@ -465,7 +567,19 @@ def latest_sql():
 def upload_files():
     try:
         uploaded_files = []
+        print(request.form)
         files = request.files.getlist('files')
+        folder_name = request.form.get('folder', '').strip()  # 获取文件夹名称
+        
+        # 如果指定了文件夹，创建文件夹路径
+        if folder_name:
+            folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder_name)
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+            upload_dir = folder_path
+        else:
+            upload_dir = app.config['UPLOAD_FOLDER']
+            folder_name = 'root'  # 根目录标识
         
         for file in files:
             if file.filename == '':
@@ -475,17 +589,16 @@ def upload_files():
             allowed_extensions = {'txt', 'pdf'}
             if not ('.' in file.filename and 
                     file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
-                return jsonify({'error': f'文件 {file.filename} 格式不支持'}), 400
+                return jsonify({'error': f'File {file.filename} format not supported'}), 400
             
             # 使用安全的原始文件名
             filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file_path = os.path.join(upload_dir, filename)
             
             # 如果文件已存在，直接跳过
             if os.path.exists(file_path):
                 continue
             
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
             
             # 获取文件信息
@@ -506,16 +619,17 @@ def upload_files():
                         content = None
             
             uploaded_files.append({
-                'id': abs(hash(filename)),  # 使用文件名hash作为固定ID
+                'id': abs(hash(f"{folder_name}_{filename}")),  # 使用文件夹+文件名hash作为固定ID
                 'name': filename,
                 'filename': filename,
+                'folder': folder_name,  # 添加文件夹信息
                 'content': content,
                 'size': file_size,
                 'type': 'application/pdf' if filename.lower().endswith('.pdf') else 'text/plain',
                 'uploadTime': upload_time
             })
         
-        return jsonify({'files': uploaded_files, 'message': f'成功上传 {len(uploaded_files)} 个文件'})
+        return jsonify({'files': uploaded_files, 'message': f'Successfully uploaded {len(uploaded_files)} files'})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -524,36 +638,51 @@ def upload_files():
 def get_documents():
     try:
         documents = []
-        if os.path.exists(app.config['UPLOAD_FOLDER']):
-            for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                if os.path.isfile(file_path):
-                    file_size = os.path.getsize(file_path)
+        
+        def scan_folder(folder_path, folder_name='root'):
+            """递归扫描文件夹"""
+            if not os.path.exists(folder_path):
+                return
+                
+            for item in os.listdir(folder_path):
+                item_path = os.path.join(folder_path, item)
+                
+                if os.path.isfile(item_path):
+                    # 处理文件
+                    file_size = os.path.getsize(item_path)
                     upload_time = time.strftime('%Y-%m-%d %H:%M:%S', 
-                                               time.localtime(os.path.getctime(file_path)))
+                                               time.localtime(os.path.getctime(item_path)))
                     
                     # 读取文件内容（仅文本文件）
                     content = None
-                    if filename.lower().endswith('.txt'):
+                    if item.lower().endswith('.txt'):
                         try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
+                            with open(item_path, 'r', encoding='utf-8') as f:
                                 content = f.read()
                         except UnicodeDecodeError:
                             try:
-                                with open(file_path, 'r', encoding='gbk') as f:
+                                with open(item_path, 'r', encoding='gbk') as f:
                                     content = f.read()
                             except:
                                 content = None
                     
                     documents.append({
-                        'id': hash(filename),  # 使用文件名hash作为ID
-                        'name': filename,
-                        'filename': filename,
+                        'id': abs(hash(f"{folder_name}_{item}")),  # 使用文件夹+文件名hash作为ID
+                        'name': item,
+                        'filename': item,
+                        'folder': folder_name,  # 添加文件夹信息
                         'content': content,
                         'size': file_size,
-                        'type': 'application/pdf' if filename.lower().endswith('.pdf') else 'text/plain',
+                        'type': 'application/pdf' if item.lower().endswith('.pdf') else 'text/plain',
                         'uploadTime': upload_time
                     })
+                elif os.path.isdir(item_path):
+                    # 递归处理子文件夹
+                    scan_folder(item_path, item)
+        
+        # 扫描上传文件夹
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            scan_folder(app.config['UPLOAD_FOLDER'])
         
         return jsonify(documents)
     
@@ -563,12 +692,24 @@ def get_documents():
 @app.route('/api/documents/<filename>', methods=['DELETE'])
 def delete_document(filename):
     try:
+        # 首先在根目录查找
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            return jsonify({'message': f'文件 {filename} 删除成功'})
-        else:
-            return jsonify({'error': '文件不存在'}), 404
+        
+        # 如果根目录没找到，递归查找所有子文件夹
+        if not os.path.exists(file_path):
+            found_path = None
+            for root, dirs, files in os.walk(app.config['UPLOAD_FOLDER']):
+                if filename in files:
+                    found_path = os.path.join(root, filename)
+                    break
+            
+            if found_path:
+                file_path = found_path
+            else:
+                return jsonify({'error': 'File not found'}), 404
+        
+        os.remove(file_path)
+        return jsonify({'message': f'File {filename} deleted successfully'})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -576,11 +717,49 @@ def delete_document(filename):
 @app.route('/api/documents/<filename>/download', methods=['GET'])
 def download_document(filename):
     try:
+        # 首先在根目录查找
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(file_path):
-            return send_file(file_path, as_attachment=True, download_name=filename)
-        else:
-            return jsonify({'error': '文件不存在'}), 404
+        
+        # 如果根目录没找到，递归查找所有子文件夹
+        if not os.path.exists(file_path):
+            found_path = None
+            for root, dirs, files in os.walk(app.config['UPLOAD_FOLDER']):
+                if filename in files:
+                    found_path = os.path.join(root, filename)
+                    break
+            
+            if found_path:
+                file_path = found_path
+            else:
+                return jsonify({'error': 'File not found'}), 404
+        
+        return send_file(file_path, as_attachment=True, download_name=filename)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/folders', methods=['GET'])
+def get_folders():
+    """获取文件夹结构"""
+    try:
+        folders = []
+        
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            for item in os.listdir(app.config['UPLOAD_FOLDER']):
+                item_path = os.path.join(app.config['UPLOAD_FOLDER'], item)
+                if os.path.isdir(item_path):
+                    # 统计文件夹中的文件数量
+                    file_count = 0
+                    for root, dirs, files in os.walk(item_path):
+                        file_count += len([f for f in files if f.lower().endswith(('.txt', '.pdf'))])
+                    
+                    folders.append({
+                        'name': item,
+                        'path': item,
+                        'fileCount': file_count
+                    })
+        
+        return jsonify(folders)
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

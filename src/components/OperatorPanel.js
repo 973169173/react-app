@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Input, Select, Collapse, Space, Typography, Badge, Dropdown, Table, Modal, List, App } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Button, Input, Select, Collapse, Space, Typography, Badge, Dropdown, Table, Modal, List, App, Tag } from 'antd';
 import { 
   PlusOutlined, 
   MoreOutlined, 
@@ -9,6 +9,7 @@ import {
   CopyOutlined,
   SaveOutlined,
   FolderOpenOutlined,
+  DatabaseOutlined,
 
 } from '@ant-design/icons';
 import {
@@ -31,10 +32,83 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 
-const { TextArea } = Input;
 const { Option } = Select;
 const { Panel } = Collapse;
 const { Title, Text } = Typography;
+
+// 索引选择模态框组件
+const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, loading }) => {
+  const [localSelectedIndexes, setLocalSelectedIndexes] = useState([]);
+
+  // 当模态框打开时，初始化本地选择状态
+  useEffect(() => {
+    if (visible) {
+      setLocalSelectedIndexes(selectedIndexes || []);
+    }
+  }, [visible, selectedIndexes]);
+
+  const handleSave = () => {
+    onSave(localSelectedIndexes);
+  };
+
+  const handleSelectAll = () => {
+    setLocalSelectedIndexes(availableIndexes.map(index => index.id));
+  };
+
+  const handleClearAll = () => {
+    setLocalSelectedIndexes([]);
+  };
+
+  return (
+    <Modal
+      title="Select Indexes"
+      open={visible}
+      onCancel={onCancel}
+      onOk={handleSave}
+      okText="Save"
+      cancelText="Cancel"
+      width={600}
+    >
+      <div style={{ marginBottom: 16 }}>
+        <Space>
+          <Button size="small" onClick={handleSelectAll}>
+            Select All
+          </Button>
+          <Button size="small" onClick={handleClearAll}>
+            Clear All
+          </Button>
+          <Text type="secondary">
+            Selected: {localSelectedIndexes.length} / {availableIndexes.length}
+          </Text>
+        </Space>
+      </div>
+      
+      <Select
+        mode="multiple"
+        placeholder="Select indexes..."
+        value={localSelectedIndexes}
+        onChange={setLocalSelectedIndexes}
+        style={{ width: '100%' }}
+        loading={loading}
+        showSearch
+        filterOption={(input, option) =>
+          option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+        }
+      >
+        {availableIndexes.map(index => (
+          <Option key={index.id} value={index.id}>
+            <div>
+              <div>{index.name}</div>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                {index.description}
+              </Text>
+            </div>
+          </Option>
+        ))}
+      </Select>
+    </Modal>
+  );
+};
 
 // 算子参数配置
 const OPERATOR_PARAMETERS = {
@@ -494,6 +568,12 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   const [savedWorkflows, setSavedWorkflows] = useState([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
 
+  // 索引选择相关状态
+  const [indexModalVisible, setIndexModalVisible] = useState(false);
+  const [selectedGlobalIndexes, setSelectedGlobalIndexes] = useState([]); // 全局选中的索引
+  const [availableIndexes, setAvailableIndexes] = useState([]);
+  const [loadingIndexes, setLoadingIndexes] = useState(false);
+
   // // 页面加载时自动获取最新的workflow
   // useEffect(() => {
   //   (async () => {
@@ -513,6 +593,29 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   //   })();
   // }, []);
   const [savingWorkflow, setSavingWorkflow] = useState(false);
+
+  // 获取可用索引列表
+  const fetchIndexes = useCallback(async () => {
+    setLoadingIndexes(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/existindex?function_name=${projectInfo?.function_name}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch indexes');
+      }
+      const data = await response.json();
+      setAvailableIndexes(data.indexes || []);
+    } catch (error) {
+      console.error('Failed to fetch indexes:', error);
+      message.error('Failed to load index options');
+    } finally {
+      setLoadingIndexes(false);
+    }
+  }, [message]);
+
+  // 组件挂载时获取索引列表
+  useEffect(() => {
+    fetchIndexes();
+  }, [fetchIndexes]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -592,6 +695,12 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         delete processedParameters.columns;
       }
 
+      // 获取选中索引的名称列表
+      const selectedIndexNames = selectedGlobalIndexes.map(id => {
+        const index = availableIndexes.find(idx => idx.id === id);
+        return index ? index.name : id;
+      });
+
       if (operator.type === 'extract') {
         response = await fetch('http://localhost:5000/api/extract', {
           method: 'POST',
@@ -603,7 +712,8 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null
+            function_name: projectInfo?.function_name || null,
+            selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
       }
@@ -618,7 +728,8 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null
+            function_name: projectInfo?.function_name || null,
+            selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
       }
@@ -633,7 +744,8 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null
+            function_name: projectInfo?.function_name || null,
+            selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
       }
@@ -676,9 +788,50 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         ...operator,
         id: Date.now().toString(),
         name: operator.name + '_copy',
-        parameters: { ...operator.parameters } 
+        parameters: { ...operator.parameters }
       };
       setOperators([...operators, newOperator]);
+    }
+  };
+
+  // 处理索引选择
+  const handleSelectIndexes = () => {
+    setIndexModalVisible(true);
+  };
+
+  // 保存索引选择
+  const handleSaveIndexSelection = async (selectedIndexIds) => {
+    try {
+      // 获取选中索引的名称列表
+      const selectedIndexNames = selectedIndexIds.map(id => {
+        const index = availableIndexes.find(idx => idx.id === id);
+        return index ? index.name : id;
+      });
+
+      const response = await fetch('http://localhost:5000/api/save-index-selection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          function_name: projectInfo?.function_name || null,
+          selected_indexes: selectedIndexNames // 传递名称列表而不是ID
+        })
+      });
+      console.log('Selected index names:', selectedIndexNames);
+      
+      if (!response.ok) {
+        throw new Error('Failed to save index selection');
+      }
+
+      const result = await response.json();
+      setSelectedGlobalIndexes(selectedIndexIds);
+      setIndexModalVisible(false);
+      message.success(`索引选择已保存 (${result.selected_count} 个索引)`);
+      
+    } catch (error) {
+      console.error('Failed to save index selection:', error);
+      message.error('保存索引选择失败');
     }
   };
 
@@ -748,7 +901,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         const columnDescriptions = operator.parameters.columns
           .filter(col => col.columnname && col.columnname.trim())
           .map(col => `${col.columnname.trim()}${col.description ? ':' + col.description.trim() : ''}`)
-          .join(', ');
+          .join('\n');
         
         if (columnDescriptions) {
           processedParameters.columns_prompt = columnDescriptions;
@@ -928,6 +1081,20 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
                 Save
               </Button>
               <Button 
+                size="small"
+                icon={<DatabaseOutlined />}
+                onClick={() => setIndexModalVisible(true)}
+              >
+                Indexes
+                {selectedGlobalIndexes.length > 0 && (
+                  <Badge 
+                    count={selectedGlobalIndexes.length} 
+                    size="small" 
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+              </Button>
+              <Button 
                 type="primary" 
                 icon={<PlusOutlined />}
                 onClick={handleAddOperator}
@@ -1019,6 +1186,16 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           locale={{ emptyText: 'Not available' }}
         />
       </Modal>
+
+      {/* 索引选择模态框 */}
+      <IndexSelectionModal
+        visible={indexModalVisible}
+        onCancel={() => setIndexModalVisible(false)}
+        onSave={handleSaveIndexSelection}
+        availableIndexes={availableIndexes}
+        selectedIndexes={selectedGlobalIndexes}
+        loading={loadingIndexes}
+      />
     </div>
   );
 };
