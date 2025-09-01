@@ -685,7 +685,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         const columnDescriptions = operator.parameters.columns
           .filter(col => col.columnname && col.columnname.trim())
           .map(col => `${col.columnname.trim()}${col.description ? ':' + col.description.trim() : ''}`)
-          .join(', ');
+          .join('\n');
         
         if (columnDescriptions) {
           processedParameters.columns_prompt = columnDescriptions;

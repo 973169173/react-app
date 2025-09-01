@@ -37,9 +37,9 @@ fun = OperationImplementation()
 def extract_data():
     #time.sleep(10)
     print(request.json)
-    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
     tablename,columnname=parameters.get('tablename',''),parameters.get('column_name','')
-    print(type,prompt,model,parameters);
+    print(type,prompt,model,parameters)
     fo_name=fun.extract_text(foname,tablename,columnname)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
@@ -49,20 +49,26 @@ def extract_data():
 
 @app.route('/api/filter', methods=['POST'])
 def filter():
-    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
-    tablename,columnname=parameters.get('tablename',''),parameters.get('column_name','')
-    print(type,prompt,model,parameters);
-    fo_name=fun.extract_text(foname,tablename,columnname)
+    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
+    tablename,condition,columnname=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name','')
+    print(type,prompt,model,parameters)
+    fo_name=fun.filter_text(foname,tablename,columnname,condition)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
         'table':df.to_dict(orient="split")})
 
 @app.route('/api/retrieve', methods=['POST'])
-def filter():
-    type,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
+def retrieve():
+    print("get json\n", request.json)
+    type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name');
     tablename,columnname,prompt =parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
-    print(type,prompt,model,parameters);
+    
+    print(type,prompt,model,parameters)
+    indexer_name_list = fun.get_database_indexer_name_list()  # Modify
+    print("indexer: ", indexer_name_list)
+
+    foname = fun.add_indexer_list(foname, indexer_name_list, indexer_name_list)
     fo_name=fun.retrieve_text(foname,tablename,columnname,prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
@@ -94,17 +100,21 @@ def sql_query():
 
 @app.route('/api/build-index', methods=['POST'])
 def build_index():
+    
     try:
         # 获取请求数据
+        print("IN")
         request_data = request.json
         if not request_data:
             return jsonify({'error': 'No request data provided'}), 400
-            
+        print("OUT")
+        print(request_data)
 
         foldername=request_data.get('folderName', "")
         document_names = request_data.get('documents', "")
         tabel_name = request_data.get('indexName',"")
-        base_path = "/home/lijianhui/workspace/react-app/src/files/"+foldername
+        base_path = "/home/lijianhui/workspace/react-app/src/files/"+foldername[0] # Modify
+        print("now build from:", document_names, " ", tabel_name, " ", base_path)
         full_paths = [os.path.join(base_path, name) for name in document_names]
         fun.build_indexer([base_path], [tabel_name], ['TextDoc'])
 
@@ -133,9 +143,9 @@ def create_project():
         indexname=project_data.get('index_name','')
         projectname=project_data.get('project_name','')
         if indexname:
-            foname=fun.create_funcObject([indexname])
+            foname=fun.create_funcObject(projectname, [indexname])
         else:
-            foname=fun.create_empty_funcObject()
+            foname=fun.create_empty_funcObject(projectname)
         # 返回成功结果
         result = {
             'function_name': foname,
