@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/lijianhui/workspace/quest')
+sys.path.append('/home/yuxinjiang/quest')
 
 
 from flask import Flask, jsonify, request, send_file
@@ -163,7 +163,8 @@ def get_indexes():
     """获取可用的索引列表"""
     try:
         indexes =fun.get_database_indexer_name_list()
-        
+        #indexes=["111","222","333"]
+        print(indexes)
         return jsonify({
             'indexes': indexes,
             'total': len(indexes)
@@ -177,8 +178,8 @@ def get_existindexes():
     """获取可用的索引列表"""
     try:
         function_name = request.args.get('function_name', '')
-        indexes =fun.get_exist_indexer_name(function_name)
-        
+        indexes =fun.get_database_indexer_name_list()
+        #indexes=["111","222","333"]
         return jsonify({
             'indexes': indexes,
             'total': len(indexes)

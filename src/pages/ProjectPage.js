@@ -275,9 +275,10 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
                 option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
               }
             >
-              {indexOptions.map(index => (
-                <Option key={index.id} value={index.id}>
-                  {index.name}
+              {indexOptions.map((index, i) => (
+                <Option key={typeof index === 'string' ? index : index.id || i} 
+                        value={typeof index === 'string' ? index : index.id}>
+                  {typeof index === 'string' ? index : index.name}
                 </Option>
               ))}
             </Select>

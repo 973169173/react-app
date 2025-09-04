@@ -52,7 +52,9 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
   };
 
   const handleSelectAll = () => {
-    setLocalSelectedIndexes(availableIndexes.map(index => index.id));
+    setLocalSelectedIndexes(availableIndexes.map(index => 
+      typeof index === 'string' ? index : index.id
+    ));
   };
 
   const handleClearAll = () => {
@@ -95,12 +97,13 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
           option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
         }
       >
-        {availableIndexes.map(index => (
-          <Option key={index.id} value={index.id}>
+        {availableIndexes.map((index, i) => (
+          <Option key={typeof index === 'string' ? index : index.id || i} 
+                  value={typeof index === 'string' ? index : index.id}>
             <div>
-              <div>{index.name}</div>
+              <div>{typeof index === 'string' ? index : index.name}</div>
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                {index.description}
+                {typeof index === 'string' ? '' : (index.description || '')}
               </Text>
             </div>
           </Option>
@@ -603,6 +606,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         throw new Error('Failed to fetch indexes');
       }
       const data = await response.json();
+      console.log('Fetched indexes:', data);
       setAvailableIndexes(data.indexes || []);
     } catch (error) {
       console.error('Failed to fetch indexes:', error);
