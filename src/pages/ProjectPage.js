@@ -10,33 +10,30 @@ const { Option } = Select;
 const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
   const [currentView, setCurrentView] = useState('projects'); // 'projects' or 'operators'
   const [selectedProject, setSelectedProject] = useState(null);
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      name: 'Document Processing Project',
-      function_name: 'document_processor',
-      createdAt: '2025-08-23',
-      status: 'active'
-    },
-    {
-      id: 2,
-      name: 'Data Extraction Pipeline',
-      function_name: 'data_extractor',
-      createdAt: '2025-08-22',
-      status: 'active'
-    },
-    {
-      id: 3,
-      name: 'Text Analysis System',
-      function_name: 'text_analyzer',
-      createdAt: '2025-08-21',
-      status: 'active'
-    }
-  ]);
+  const [projects, setProjects] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [indexOptions, setIndexOptions] = useState([]);
   const [loadingIndexes, setLoadingIndexes] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // 获取项目列表
+  const fetchProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/projects');
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      const data = await response.json();
+      setProjects(data.projects || []);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+      message.error('Failed to load projects');
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   // 获取索引列表
   const fetchIndexes = async () => {
@@ -56,8 +53,9 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
     }
   };
 
-  // 组件挂载时获取索引列表
+  // 组件挂载时获取项目列表和索引列表
   useEffect(() => {
+    fetchProjects();
     fetchIndexes();
   }, []);
 
@@ -87,11 +85,10 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-          body: JSON.stringify({
+        body: JSON.stringify({
           project_name: values.projectname,
           description: values.description,
           index_name: values.index_name || '',
-
         })
       });
 
@@ -102,17 +99,9 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
 
       const result = await response.json();
       
-      // 将创建的项目添加到列表
-      const newProject = {
-        name: values.name,
-        function_name: result.function_name,
-        description: values.description,
-        index_name: values.index_name || '',
-        createdAt: new Date().toLocaleString("sv-SE").replace(" ", "T"),
-        status: result.status || 'active'
-      };
+      // 创建成功后重新获取项目列表以确保数据同步
+      await fetchProjects();
       
-      setProjects([...projects, newProject]);
       setIsModalVisible(false);
       form.resetFields();
       message.success('Project created successfully');
@@ -128,16 +117,32 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
     form.resetFields();
   };
 
-  const handleDeleteProject = (projectId, e) => {
+  const handleDeleteProject = async (projectId, e) => {
     e.stopPropagation();
     Modal.confirm({
       title: 'Confirm Delete',
       content: 'Are you sure you want to delete this project? This action cannot be undone.',
-      onOk: () => {
-        setProjects(projects.filter(p => p.id !== projectId));
-        message.success('Project deleted successfully');
+      onOk: async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/projects/${projectId}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete project');
+          }
+
+          // 删除成功后重新获取项目列表
+          await fetchProjects();
+          message.success('Project deleted successfully');
+        } catch (error) {
+          console.error('Delete project failed:', error);
+          message.error('Failed to delete project: ' + error.message);
+        }
       }
     });
+            
   };
 
   if (currentView === 'operators' && selectedProject) {
@@ -187,6 +192,7 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
             xl: 3,
             xxl: 4,
           }}
+          loading={loadingProjects}
           dataSource={projects}
           renderItem={(project) => (
             <List.Item>

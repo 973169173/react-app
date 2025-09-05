@@ -7,22 +7,24 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import pandas as pd
 import time
+import uuid
 
 app = Flask(__name__)
 CORS(app)
 
-# 配置上传文件夹和数据文件夹
+# 配置上传文件夹、数据文件夹和项目文件夹
 UPLOAD_FOLDER = 'files'
 DATA_FOLDER = 'data'
+PROJECTS_FOLDER = 'projects'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['DATA_FOLDER'] = DATA_FOLDER
+app.config['PROJECTS_FOLDER'] = PROJECTS_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# 创建上传目录和数据目录
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-if not os.path.exists(DATA_FOLDER):
-    os.makedirs(DATA_FOLDER)
+# 创建必要的目录
+for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 @app.route('/api/extract', methods=['POST'])
 def extract_data():
@@ -111,22 +113,223 @@ def build_index():
         return jsonify({'error': f'Failed to build index: {str(e)}'}), 500
 
 
+# ==================== 项目管理相关接口 ====================
+
+def get_projects_file_path():
+    """获取项目数据文件路径"""
+    return os.path.join(app.config['PROJECTS_FOLDER'], 'projects.json')
+
+def load_projects():
+    """从文件加载项目数据"""
+    try:
+        projects_file = get_projects_file_path()
+        if os.path.exists(projects_file):
+            with open(projects_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error loading projects: {e}")
+        return []
+
+def save_projects(projects):
+    """保存项目数据到文件"""
+    try:
+        projects_file = get_projects_file_path()
+        with open(projects_file, 'w', encoding='utf-8') as f:
+            json.dump(projects, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving projects: {e}")
+        return False
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    """获取项目列表"""
+    try:
+        projects = load_projects()
+        return jsonify({
+            'projects': projects,
+            'total': len(projects)
+        })
+    except Exception as e:
+        return jsonify({'error': f'获取项目列表失败: {str(e)}'}), 500
+
 @app.route('/api/projects', methods=['POST'])
 def create_project():
+    """创建新项目"""
     try:
         project_data = request.json
         if not project_data:
             return jsonify({'error': '无效的项目数据'}), 400
-        result = {
-            'function_name': '111',
-            'status': 'active'
-        }
-        
-        return jsonify(result)
 
+        # 验证必需字段
+        required_fields = ['project_name']
+        for field in required_fields:
+            if not project_data.get(field):
+                return jsonify({'error': f'缺少必需字段: {field}'}), 400
+
+        # 加载现有项目
+        projects = load_projects()
+
+        # 检查项目名是否已存在
+        existing_names = [p['name'] for p in projects]
+        if project_data['project_name'] in existing_names:
+            return jsonify({'error': '项目名称已存在'}), 400
+
+        # 生成唯一ID
+        project_id = str(uuid.uuid4())
         
+        # 生成函数名（基于项目名称）
+        function_name = project_data['project_name'].lower().replace(' ', '_').replace('-', '_')
+        function_name = ''.join(c for c in function_name if c.isalnum() or c == '_')
+        
+        # 创建新项目
+        new_project = {
+            'id': project_id,
+            'name': project_data['project_name'],
+            'function_name': function_name,
+            'description': project_data.get('description', ''),
+            'index_name': project_data.get('index_name', ''),
+            'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'updatedAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'status': 'active',
+            'created_by': 'system'  # 可以后续改为实际用户
+        }
+
+        # 添加到项目列表
+        projects.append(new_project)
+
+        # 保存到文件
+        if not save_projects(projects):
+            return jsonify({'error': '保存项目失败'}), 500
+
+        return jsonify({
+            'message': '项目创建成功',
+            'project': new_project,
+            'function_name': function_name,
+            'status': 'active'
+        })
+
     except Exception as e:
         return jsonify({'error': f'创建项目失败: {str(e)}'}), 500
+
+@app.route('/api/projects/<project_id>', methods=['GET'])
+def get_project(project_id):
+    """获取单个项目详情"""
+    try:
+        projects = load_projects()
+        project = next((p for p in projects if p['id'] == project_id), None)
+        
+        if not project:
+            return jsonify({'error': '项目不存在'}), 404
+            
+        return jsonify(project)
+        
+    except Exception as e:
+        return jsonify({'error': f'获取项目失败: {str(e)}'}), 500
+
+@app.route('/api/projects/<project_id>', methods=['PUT'])
+def update_project(project_id):
+    """更新项目"""
+    try:
+        project_data = request.json
+        if not project_data:
+            return jsonify({'error': '无效的项目数据'}), 400
+
+        projects = load_projects()
+        project_index = next((i for i, p in enumerate(projects) if p['id'] == project_id), None)
+        
+        if project_index is None:
+            return jsonify({'error': '项目不存在'}), 404
+
+        # 更新项目数据
+        project = projects[project_index]
+        if 'project_name' in project_data and project_data['project_name']:
+            # 检查新名称是否与其他项目冲突
+            existing_names = [p['name'] for i, p in enumerate(projects) if i != project_index]
+            if project_data['project_name'] in existing_names:
+                return jsonify({'error': '项目名称已存在'}), 400
+            project['name'] = project_data['project_name']
+        
+        if 'description' in project_data:
+            project['description'] = project_data['description']
+        
+        if 'index_name' in project_data:
+            project['index_name'] = project_data['index_name']
+        
+        if 'status' in project_data:
+            project['status'] = project_data['status']
+
+        project['updatedAt'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 保存更新
+        if not save_projects(projects):
+            return jsonify({'error': '保存项目更新失败'}), 500
+
+        return jsonify({
+            'message': '项目更新成功',
+            'project': project
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'更新项目失败: {str(e)}'}), 500
+
+@app.route('/api/projects/<project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """删除项目"""
+    try:
+        projects = load_projects()
+        project_index = next((i for i, p in enumerate(projects) if p['id'] == project_id), None)
+        
+        if project_index is None:
+            return jsonify({'error': '项目不存在'}), 404
+
+        # 获取要删除的项目信息
+        deleted_project = projects[project_index]
+        
+        # 从列表中删除
+        projects.pop(project_index)
+
+        # 保存更新
+        if not save_projects(projects):
+            return jsonify({'error': '保存删除操作失败'}), 500
+
+        return jsonify({
+            'message': '项目删除成功',
+            'deleted_project': deleted_project['name']
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'删除项目失败: {str(e)}'}), 500
+
+@app.route('/api/projects/search', methods=['GET'])
+def search_projects():
+    """搜索项目"""
+    try:
+        query = request.args.get('q', '').strip()
+        status = request.args.get('status', '').strip()
+        
+        projects = load_projects()
+        
+        # 应用搜索过滤
+        if query:
+            projects = [p for p in projects 
+                       if query.lower() in p['name'].lower() 
+                       or query.lower() in p.get('description', '').lower()]
+        
+        # 应用状态过滤
+        if status:
+            projects = [p for p in projects if p.get('status') == status]
+        
+        return jsonify({
+            'projects': projects,
+            'total': len(projects),
+            'query': query,
+            'status_filter': status
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'搜索项目失败: {str(e)}'}), 500
 
 @app.route('/api/indexes', methods=['GET'])
 def get_indexes():
