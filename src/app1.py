@@ -16,18 +16,19 @@ import uuid
 app = Flask(__name__)
 CORS(app)
 
-# 配置上传文件夹和数据文件夹
+# 配置上传文件夹、数据文件夹和项目文件夹
 UPLOAD_FOLDER = 'files'
 DATA_FOLDER = 'data'
+PROJECTS_FOLDER = 'projects'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['DATA_FOLDER'] = DATA_FOLDER
+app.config['PROJECTS_FOLDER'] = PROJECTS_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# 创建上传目录和数据目录
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-if not os.path.exists(DATA_FOLDER):
-    os.makedirs(DATA_FOLDER)
+# 创建必要的目录
+for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 from quest.backend.interface.operation import OperationImplementation
 
