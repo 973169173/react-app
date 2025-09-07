@@ -1,0 +1,89 @@
+{
+  "operators": [
+    {
+      "id": "1",
+      "name": "test_1",
+      "type": "extract",
+      "model": "gpt-4o",
+      "status": "enabled",
+      "output": "{\"columns\":[\"doc\",\"age\",\"name\",\"_source_age\",\"_source_name\"],\"data\":[[\"Aaron_Williams.txt\",\"30\",\"Aaron Williams\",\"Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.\",\"In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).\"],[\"1111111\",\"12\",\"121\",\"121\",\"111\"],[\"222222222\",\"212\",\"121\",\"121\",\"111\"]],\"index\":[0,1,2]}",
+     
+      "parameters": {
+        "tablename": "test",
+        "columns": [
+          {
+            "columnname": "name",
+            "description": "name"
+          },
+          {
+            "columnname": "age",
+            "description": "age"
+          }
+        ]
+      }
+    },
+    {
+      "id": "1757246827793",
+      "name": "test_2",
+      "type": "filter",
+      "prompt": "",
+      "model": "gpt-4o",
+      "status": "enabled",
+      "output": "{\"columns\":[\"doc\",\"age\",\"name\",\"_source_age\",\"_source_name\"],\"data\":[[\"Aaron_Williams.txt\",\"30\",\"Aaron Williams\",\"Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.\",\"In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).\"],[\"1111111\",\"12\",\"121\",\"121\",\"111\"],[\"222222222\",\"212\",\"121\",\"121\",\"111\"]],\"index\":[0,1,2]}",
+      
+      "parameters": {
+        "tablename": "test",
+        "columns": [
+          {
+            "columnname": "age",
+            "description": "age"
+          },
+          {
+            "columnname": "name",
+            "description": "name"
+          }
+        ],
+        "condition": "age>30"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "id": 4236820182136853000,
+      "name": "2.txt"
+    },
+    {
+      "id": 2276049310713748500,
+      "name": "3.txt"
+    },
+    {
+      "id": 5473335569359665000,
+      "name": "4.txt"
+    },
+    {
+      "id": 1342516631259685000,
+      "name": "5.txt"
+    },
+    {
+      "id": 3460945843429340700,
+      "name": "1.txt"
+    },
+    {
+      "id": 148402556720581660,
+      "name": "Bam_Adebayo.txt"
+    },
+    {
+      "id": 3631844517642127000,
+      "name": "Aaron_Williams.txt"
+    },
+    {
+      "id": 2311465024448792600,
+      "name": "Antonius_Cleveland.txt"
+    },
+    {
+      "id": 5512194985431740000,
+      "name": "Bill_Hewitt.txt"
+    }
+  ],
+  "timestamp": "2025-09-07T20:10:36"
+}

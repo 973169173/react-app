@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Button, Input, Select, Collapse, Space, Typography, Badge, Dropdown, Table, Modal, List, App, Tag } from 'antd';
+import { Card, Button, Input, Select, Collapse, Space, Typography, Badge, Dropdown, Table, Modal, List, App, Tag, Segmented } from 'antd';
 import { 
   PlusOutlined, 
   MoreOutlined, 
@@ -10,8 +10,11 @@ import {
   SaveOutlined,
   FolderOpenOutlined,
   DatabaseOutlined,
+  UnorderedListOutlined,
+  NodeIndexOutlined,
 
 } from '@ant-design/icons';
+import OperatorDAG from './OperatorDAG';
 import {
   DndContext,
   closestCenter,
@@ -553,6 +556,9 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
 
 const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackToProjects, projectInfo }) => {
   const { message } = App.useApp();
+  
+  // 添加视图模式状态
+  const [viewMode, setViewMode] = useState('list'); // 'list' 或 'dag'
   
   const [operators, setOperators] = useState([
     {
@@ -1103,6 +1109,23 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           
           <div className="workflow-actions">
             <Space size="middle" wrap>
+              <Segmented
+                options={[
+                  {
+                    label: 'List View',
+                    value: 'list',
+                    icon: <UnorderedListOutlined />,
+                  },
+                  {
+                    label: 'DAG View',
+                    value: 'dag',
+                    icon: <NodeIndexOutlined />,
+                  },
+                ]}
+                value={viewMode}
+                onChange={setViewMode}
+                size="small"
+              />
               <Button 
                 size="small"
                 onClick={handleRunAllOperators}
@@ -1152,30 +1175,78 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         </div>
       </div>
 
-      <div className="operators-list">
-        <DndContext 
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext 
-            items={operators.map(op => op.id)}
-            strategy={verticalListSortingStrategy}
+      {/* 根据视图模式显示不同的内容 */}
+      {viewMode === 'list' ? (
+        <div className="operators-list">
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            {operators.map((operator) => (
-              <SortableOperatorCard
-                key={operator.id}
-                operator={operator}
-                onOperatorChange={handleOperatorChange}
-                onRunOperator={handleRunOperator}
-                onDeleteOperator={handleDeleteOperator}
-                onDuplicateOperator={handleDuplicateOperator}
-                onRowClick={onRowClick}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-      </div>
+            <SortableContext 
+              items={operators.map(op => op.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {operators.map((operator) => (
+                <SortableOperatorCard
+                  key={operator.id}
+                  operator={operator}
+                  onOperatorChange={handleOperatorChange}
+                  onRunOperator={handleRunOperator}
+                  onDeleteOperator={handleDeleteOperator}
+                  onDuplicateOperator={handleDuplicateOperator}
+                  onRowClick={onRowClick}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      ) : (
+        <div className="operators-dag">
+          <OperatorDAG
+            operators={operators}
+            dagData={{
+              "nodes": [
+                {
+                  "id": "1",
+                  "type": "Retrieve",
+                  "parameters": { 
+                    "tablename": "documents",
+                    "columns": [
+                      {"columnname": "name", "description": "name"}
+                    ]
+                  }
+                },
+                {
+                  "id": "2", 
+                  "type": "Extract",
+                  "parameters": { 
+                    "tablename": "results",
+                    "columns": [
+                      {"columnname": "age", "description": "age"}
+                    ]
+                  }
+                },
+                {
+                  "id": "3", 
+                  "type": "Extract",
+                },
+                
+              ],
+              "edges": {
+                "1": ["2","3"],
+
+              }
+            }}
+            onNodeClick={(nodeData) => {
+              // 处理节点点击事件，可以显示详细信息或执行操作
+              console.log('DAG Node clicked:', nodeData);
+              // 显示操作符详情
+
+            }}
+          />
+        </div>
+      )}
 
       {/* 加载工作流模态框 */}
       <Modal

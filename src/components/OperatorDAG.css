@@ -1,0 +1,76 @@
+/* OperatorDAG 样式 */
+.operators-dag {
+  background: #fafafa;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+/* ReactFlow 节点样式覆盖 */
+.react-flow__node-operatorNode {
+  border: none !important;
+  background: transparent !important;
+}
+
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: #1890ff !important;
+  border: 2px solid #fff !important;
+}
+
+.react-flow__handle-top {
+  top: -4px !important;
+}
+
+.react-flow__handle-bottom {
+  bottom: -4px !important;
+}
+
+/* MiniMap 样式 */
+.react-flow__minimap {
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+}
+
+/* 控制面板样式 */
+.react-flow__controls {
+  bottom: 24px;
+  left: 24px;
+}
+
+.react-flow__controls-button {
+  border: 1px solid #d9d9d9;
+  background: #fff;
+}
+
+.react-flow__controls-button:hover {
+  background: #f0f0f0;
+}
+
+/* 背景样式 */
+.react-flow__background {
+  background-color: #fafafa;
+}
+
+/* 连接线动画 */
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dash 0.5s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* 操作符卡片悬浮效果 */
+.operator-dag-card {
+  transition: all 0.3s ease;
+}
+
+.operator-dag-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
