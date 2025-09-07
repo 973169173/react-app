@@ -32,7 +32,7 @@ def extract_data():
     print(request.json)
     type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
     print(type,prompt,model,parameters);
-    foname='111'
+    foname='nnnn'
     data={
         'doc':['Aaron_Williams.txt','1111111','222222222'],
         'age':['30','12','212'],
@@ -256,6 +256,9 @@ def update_project(project_id):
         
         if 'index_name' in project_data:
             project['index_name'] = project_data['index_name']
+        
+        if 'function_name' in project_data:
+            project['function_name'] = project_data['function_name']
         
         if 'status' in project_data:
             project['status'] = project_data['status']

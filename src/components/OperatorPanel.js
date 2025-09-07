@@ -670,6 +670,39 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }));
   };
 
+  // 更新项目的 function_name
+  const updateProjectFunctionName = async (functionName) => {
+    if (!projectInfo?.id || !functionName) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/projects/${projectInfo.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          function_name: functionName
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Project function_name updated:', result);
+      
+      // 更新本地的 projectInfo
+      if (projectInfo) {
+        projectInfo.function_name = functionName;
+      }
+      
+    } catch (error) {
+      console.error('Failed to update project function_name:', error);
+      message.error('更新项目 function_name 失败');
+    }
+  };
+
   const handleRunOperator = async(id) => {
     setOperators(operators.map(op => 
       op.id === id ? { ...op, status: 'running' } : op
@@ -759,7 +792,12 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
 
 
       const data = await response.json(); // 解析 JSON 数据
-      projectInfo.function_name = data.function_name;
+      
+      // 如果返回了 function_name，更新项目信息并保存到 projects.json
+      if (data.function_name && data.function_name !== projectInfo?.function_name) {
+        await updateProjectFunctionName(data.function_name);
+      }
+      
       console.log(projectInfo)
       setOperators(prev => prev.map(op => 
         op.id === id ? { 
@@ -946,6 +984,10 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         });
       }
       const data = await response.json();
+      
+      // 如果返回了 function_name，更新项目信息并保存到 projects.json
+      
+      // await updateProjectFunctionName(data.function_name);
       setOperators(prev => prev.map(op => 
         op.id === operator.id ? {
           ...op,
