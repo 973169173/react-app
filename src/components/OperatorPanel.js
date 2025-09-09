@@ -562,18 +562,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   // 添加 DAG 数据状态
   const [dagData, setDagData] = useState(null);
   
-  const [operators, setOperators] = useState([
-    {
-      id: '1',
-      name: 'test_1',
-      type: 'extract',
-      model: 'gpt-4o',
-      status: 'enabled',
-      output: null,
-      collapsed: false,
-      parameters: {}
-    }
-  ]);
+  const [operators, setOperators] = useState([]);
 
 
 
@@ -800,10 +789,8 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       const data = await response.json(); // 解析 JSON 数据
       
       // 如果返回了 function_name，更新项目信息并保存到 projects.json
-      if (data.function_name && data.function_name !== projectInfo?.function_name) {
-        await updateProjectFunctionName(data.function_name);
-      }
-      
+
+      //await updateProjectFunctionName(data.function_name);
       console.log(projectInfo)
       setOperators(prev => prev.map(op => 
         op.id === id ? { 
@@ -1019,7 +1006,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       }
       
       const projectData = await response.json();
-      
+      console.log('Fetched project data:', projectData);
       // 更新 operators
       if (projectData.operators) {
         setOperators(projectData.operators);

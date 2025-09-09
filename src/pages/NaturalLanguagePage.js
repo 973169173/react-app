@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {Button, Input, Select, Space, Typography,  Avatar, Tag, Table, Collapse, Modal, List, App } from 'antd';
+import {Button, Input, Select, Space, Typography,  Avatar, Tag, Table, Collapse, Modal, List, App, Badge, Divider } from 'antd';
 import { 
   SendOutlined,
   SaveOutlined,
   MessageOutlined,
   UserOutlined,
   RobotOutlined,
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  DatabaseOutlined,
+  SettingOutlined
 
 } from '@ant-design/icons';
 
@@ -15,16 +17,152 @@ const { Option } = Select;
 const { Panel } = Collapse;
 const { Title, Text } = Typography;
 
-const NaturalLanguagePanel = ({ documents, onRowClick }) => {
+// 索引选择模态框组件
+const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, indexDescriptions, loading }) => {
+  const [localSelectedIndexes, setLocalSelectedIndexes] = useState([]);
+  const [localDescriptions, setLocalDescriptions] = useState({});
+
+  // 当模态框打开时，初始化本地选择状态
+  useEffect(() => {
+    if (visible) {
+      setLocalSelectedIndexes(selectedIndexes || []);
+      setLocalDescriptions(indexDescriptions || {});
+    }
+  }, [visible, selectedIndexes, indexDescriptions]);
+
+  const handleSave = () => {
+    onSave(localSelectedIndexes, localDescriptions);
+  };
+
+  const handleSelectAll = () => {
+    setLocalSelectedIndexes(availableIndexes.map(index => 
+      typeof index === 'string' ? index : index.id
+    ));
+  };
+
+  const handleClearAll = () => {
+    setLocalSelectedIndexes([]);
+  };
+
+  const handleDescriptionChange = (indexName, description) => {
+    setLocalDescriptions(prev => ({
+      ...prev,
+      [indexName]: description
+    }));
+  };
+
+  return (
+    <Modal
+      title="Configure Indexes and Descriptions"
+      open={visible}
+      onCancel={onCancel}
+      onOk={handleSave}
+      okText="Save"
+      cancelText="Cancel"
+      width={700}
+    >
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        {/* 索引选择部分 */}
+        <div>
+          <Title level={5}>Select Indexes</Title>
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <Button size="small" onClick={handleSelectAll}>
+                Select All
+              </Button>
+              <Button size="small" onClick={handleClearAll}>
+                Clear All
+              </Button>
+              <Text type="secondary">
+                Selected: {localSelectedIndexes.length} / {availableIndexes.length}
+              </Text>
+            </Space>
+          </div>
+          
+          <Select
+            mode="multiple"
+            placeholder="Select indexes..."
+            value={localSelectedIndexes}
+            onChange={setLocalSelectedIndexes}
+            style={{ width: '100%' }}
+            loading={loading}
+            showSearch
+            filterOption={(input, option) =>
+              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+            }
+          >
+            {availableIndexes.map((index, i) => (
+              <Option key={typeof index === 'string' ? index : index.id || i} 
+                      value={typeof index === 'string' ? index : index.id}>
+                <div>
+                  <div>{typeof index === 'string' ? index : index.name}</div>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    {typeof index === 'string' ? '' : (index.description || '')}
+                  </Text>
+                </div>
+              </Option>
+            ))}
+          </Select>
+        </div>
+
+        <Divider />
+
+        {/* 描述配置部分 */}
+        <div>
+          <Title level={5}>Configure Descriptions</Title>
+
+          
+          {localSelectedIndexes.length > 0 ? (
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              {localSelectedIndexes.map((indexName) => (
+                <div key={indexName} style={{ 
+                  padding: '12px', 
+                  border: '1px solid #f0f0f0', 
+                  borderRadius: '6px',
+                  backgroundColor: '#fafafa'
+                }}>
+                  <Text strong style={{ marginBottom: 8, display: 'block' }}>
+                    {indexName}
+                  </Text>
+                  <TextArea
+                    placeholder={`Describe the structure and fields of ${indexName} index...`}
+                    value={localDescriptions[indexName] || ''}
+                    onChange={(e) => handleDescriptionChange(indexName, e.target.value)}
+                    rows={3}
+                    style={{ fontSize: '12px' }}
+                  />
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <Text type="secondary" style={{ fontStyle: 'italic' }}>
+              Please select indexes first to configure their descriptions.
+            </Text>
+          )}
+        </div>
+      </Space>
+    </Modal>
+  );
+};
+
+const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const { message } = App.useApp();
   
-  const [query, setQuery] = useState('Please help me find NBA players over 30 years old');
+  const [query, setQuery] = useState('what the age and team of Jay Fletcher Vincent?');
   const [model, setModel] = useState('gpt-4o');
   const [isProcessing, setIsProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [savedConversations, setSavedConversations] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
+  
+  // 索引相关状态
+  const [indexConfigVisible, setIndexConfigVisible] = useState(false);
+  const [selectedIndexes, setSelectedIndexes] = useState([]); // 默认选择 player
+  const [availableIndexes, setAvailableIndexes] = useState([]);
+  const [loadingIndexes, setLoadingIndexes] = useState(false);
+  const [indexDescriptions, setIndexDescriptions] = useState(); // 默认描述
+  
   const conversationEndRef = useRef(null);
   const [conversations, setConversations] = useState([
     {
@@ -51,10 +189,39 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
     }
   ]);
 
+  // 获取可用索引列表
+  const fetchIndexes = async () => {
+    setLoadingIndexes(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/indexes');
+      if (!response.ok) {
+        throw new Error("HTTP error!");
+      }
+      const data = await response.json();
+      console.log('Fetched indexes:', data);
+      setAvailableIndexes(data.indexes || []);
+    } catch (error) {
+      console.error('Failed to fetch indexes:', error);
+      message.error('Failed to load index options');
+    } finally {
+      setLoadingIndexes(false);
+    }
+  };
+
+  // 组件挂载时获取索引列表
+  useEffect(() => {
+    fetchIndexes();
+  }, []);
+
 
   const handleSendMessage = async () => {
     if (!query.trim()) {
       message.warning('Please enter your question.');
+      return;
+    }
+
+    if (selectedIndexes.length === 0) {
+      message.warning('Please select at least one index.');
       return;
     }
 
@@ -70,27 +237,37 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
     setQuery('');
 
     try {
+      // 构建请求参数
+      const requestData = {
+        index: selectedIndexes, // list
+        query: query, // str
+        desc: indexDescriptions, // dict
+        model: model
+      };
+
+      console.log('Sending request with data:', requestData);
+
       const response = await fetch('http://localhost:5000/api/nl', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          content: query,
-          model: model
-        })
+        body: JSON.stringify(requestData)
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const reply = await response.json();
 
-
-      
       const assistantMessage = {
         id: Date.now() + 1,
         type: 'assistant',
         content: 'Based on the analysis of the document you provided, I have obtained the following information:',
         output: JSON.stringify(reply),
         timestamp: new Date().toLocaleTimeString(),
-        relatedDocs: reply.data.doc
+        relatedDocs: reply.data?.doc || []
       };
       
       setConversations(prev => [...prev, assistantMessage]);
@@ -108,6 +285,19 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversations, isProcessing]);
+
+  // 处理索引配置
+  const handleIndexConfig = () => {
+    setIndexConfigVisible(true);
+  };
+
+  // 保存索引配置
+  const handleSaveIndexConfig = (selectedIndexIds, descriptions) => {
+    setSelectedIndexes(selectedIndexIds);
+    setIndexDescriptions(descriptions);
+    setIndexConfigVisible(false);
+    message.success(`indexes saved successfully (${selectedIndexIds.length} indexes)`);
+  };
 
 
 
@@ -131,6 +321,8 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
       const conversationData = {
         conversations,
         model,
+        selectedIndexes,
+        indexDescriptions,
         timestamp: new Date().toLocaleString("sv-SE").replace(" ", "T")
       };
       
@@ -192,6 +384,8 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
       
       if (conversationData.conversations) {
         setConversations(conversationData.conversations);
+        setSelectedIndexes(conversationData.selectedIndexes);
+        setIndexDescriptions(conversationData.indexDescriptions);
         setModel(conversationData.model || 'gpt-4o');
         message.success(`"${filename}" load successfully！`);
         setLoadModalVisible(false);
@@ -245,7 +439,22 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
           </Title>
           <Text type="secondary">Use natural language processing documents</Text>
         </div>
+
         <Space>
+          <Button 
+            size="small"
+            icon={<DatabaseOutlined />}
+            onClick={handleIndexConfig}
+          >
+            Indexes
+            {selectedIndexes.length > 0 && (
+              <Badge 
+                count={selectedIndexes.length} 
+                size="small" 
+                style={{ marginLeft: 4 }}
+              />
+            )}
+          </Button>
           <Button
             size="small"
             icon={<FolderOpenOutlined />}
@@ -271,7 +480,8 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
             <Option value="gpt-4.1">GPT-4.1</Option>
             <Option value="claude">Claude</Option>
           </Select>
-        </Space>
+          </Space>
+
       </div>
 
       <div className="nl-content" style={{ 
@@ -460,6 +670,31 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
           border: '1px solid #f0f0f0'
         }}>
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {/* 当前配置显示 */}
+            {selectedIndexes.length > 0 && (
+              <div style={{ 
+                padding: '8px 12px', 
+                backgroundColor: '#f6ffed', 
+                borderRadius: '4px',
+                border: '1px solid #b7eb8f'
+              }}>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  Selected Indexes: 
+                </Text>
+                <div style={{ marginTop: 4 }}>
+                  {selectedIndexes.map(index => (
+                    <Tag 
+                      key={index}
+                      color="green" 
+                      style={{ margin: '2px' }}
+                    >
+                      {index}
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <TextArea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -477,7 +712,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
                 icon={<SendOutlined />}
                 onClick={handleSendMessage}
                 loading={isProcessing}
-                disabled={!query.trim()}
+                disabled={!query.trim() || selectedIndexes.length === 0}
               >
                 Send Message
               </Button>
@@ -541,6 +776,17 @@ const NaturalLanguagePanel = ({ documents, onRowClick }) => {
           locale={{ emptyText: 'No saved conversations' }}  
         />
       </Modal>
+      
+      {/* 索引配置模态框 */}
+      <IndexConfigModal
+        visible={indexConfigVisible}
+        onCancel={() => setIndexConfigVisible(false)}
+        onSave={handleSaveIndexConfig}
+        availableIndexes={availableIndexes}
+        selectedIndexes={selectedIndexes}
+        indexDescriptions={indexDescriptions}
+        loading={loadingIndexes}
+      />
     </div>
   );
 };

@@ -81,15 +81,12 @@ def retrieve():
 
 @app.route('/api/nl',methods=['POST'])
 def nl():
-    content,model=request.json.get('content'),request.json.get('model')
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':[['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).'],'121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
-    }
-    df=pd.DataFrame(data)
+    request_data = request.get_json(force=False, silent=False)
+    table,query,desc=request_data.get("index"),request_data.get("query"),request_data.get("desc")
+    print(type(table), table)
+    print(type(query), query)
+    print(type(desc), desc)
+    df=fun.solve_agent(table,query,desc)
     return jsonify(df.to_dict(orient="split"))
 
 
@@ -352,7 +349,7 @@ def get_project_data(foname):
 
 @app.route('/api/indexes', methods=['GET'])
 def get_indexes():
-    """获取可用的索引列表"""
+    """获取数据库的索引列表"""
     try:
         indexes =fun.get_database_indexer_name_list()
         #indexes=["111","222","333"]
@@ -367,10 +364,10 @@ def get_indexes():
 
 @app.route('/api/existindex', methods=['GET'])
 def get_existindexes():
-    """获取可用的索引列表"""
+    """获取已有的的索引列表"""
     try:
         function_name = request.args.get('function_name', '')
-        indexes =fun.get_database_indexer_name_list()
+        indexes =fun.get_exist_indexer_name(function_name)
         #indexes=["111","222","333"]
         return jsonify({
             'indexes': indexes,
