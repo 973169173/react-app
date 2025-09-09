@@ -96,7 +96,8 @@ def nl():
 @app.route('/api/sql', methods=['POST'])
 def sql_query():
     #time.sleep(2)
-    sql,description,model = request.json.get('sql'), request.json.get('description'), request.json.get('model')
+    sql,description,model = request.json.get('query'), request.json.get('description'), request.json.get('model')
+    print(sql,description,model)
     df=fun.solve_sql(sql,description,model)
     return jsonify(df.to_dict(orient="split"))
 
@@ -335,6 +336,18 @@ def delete_project(project_id):
     except Exception as e:
         return jsonify({'error': f'删除项目失败: {str(e)}'}), 500
 
+@app.route('/api/project-data/<foname>', methods=['GET'])
+def get_project_data(foname):
+    """获取项目的operators, nodes, indeg, edges数据"""
+    try:
+        project_data=fun.get_project_info(foname)
+        
+        
+        return jsonify(project_data)
+        
+    except Exception as e:
+        return jsonify({'error': f'获取项目数据失败: {str(e)}'}), 500
+
 
 
 @app.route('/api/indexes', methods=['GET'])
@@ -405,28 +418,29 @@ def save_index_selection():
 @app.route('/api/save-workflow', methods=['POST'])
 def save_workflow():
     try:
-        workflow_data = request.json
+
         
+        workflow_data = request.json.get("operators")
+        foname=request.json.get("function_name")
+        print(foname,"save")
         if not workflow_data:
             return jsonify({'error': '没有收到工作流数据'}), 400
         
-        # 生成文件名（使用时间戳）
-        timestamp = workflow_data.get('timestamp', time.strftime('%Y%m%d_%H%M%S'))
-        filename = f"workflow_{timestamp.replace(':', '-').replace('T', '_').split('.')[0]}.json"
+        # # 生成文件名（使用时间戳）
+        # timestamp = workflow_data.get('timestamp', time.strftime('%Y%m%d_%H%M%S'))
+        # filename = f"workflow_{timestamp.replace(':', '-').replace('T', '_').split('.')[0]}.json"
         
-        # 保存到data目录
-        file_path = os.path.join(app.config['DATA_FOLDER'], filename)
+        # # 保存到data目录
+        # file_path = os.path.join(app.config['DATA_FOLDER'], filename)
         
-        # 写入JSON文件
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(workflow_data, f, ensure_ascii=False, indent=2)
-        
+        # # 写入JSON文件
+        # with open(file_path, 'w', encoding='utf-8') as f:
+        #     json.dump(workflow_data, f, ensure_ascii=False, indent=2)
+       
+        fun.save_project(foname, workflow_data)
+
         return jsonify({
-            'message': 'Saved successfully',
-            'filename': filename,
-            'path': file_path,
-            'operators_count': len(workflow_data.get('operators', [])),
-            'documents_count': len(workflow_data.get('documents', []))
+            'message': 'Saved successfully'
         })
         
     except Exception as e:

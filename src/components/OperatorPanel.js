@@ -8,7 +8,6 @@ import {
   DeleteOutlined,
   CopyOutlined,
   SaveOutlined,
-  FolderOpenOutlined,
   DatabaseOutlined,
   UnorderedListOutlined,
   NodeIndexOutlined,
@@ -560,6 +559,9 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   // 添加视图模式状态
   const [viewMode, setViewMode] = useState('list'); // 'list' 或 'dag'
   
+  // 添加 DAG 数据状态
+  const [dagData, setDagData] = useState(null);
+  
   const [operators, setOperators] = useState([
     {
       id: '1',
@@ -573,9 +575,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   ]);
 
-  const [loadModalVisible, setLoadModalVisible] = useState(false);
-  const [savedWorkflows, setSavedWorkflows] = useState([]);
-  const [loadingWorkflows, setLoadingWorkflows] = useState(false);
+
 
   // 索引选择相关状态
   const [indexModalVisible, setIndexModalVisible] = useState(false);
@@ -888,9 +888,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       setSavingWorkflow(true);
       
       const workflow = {
-        operators,
-        documents: documents.map(doc => ({ id: doc.id, name: doc.name })),
-        timestamp: new Date().toLocaleString("sv-SE").replace(" ", "T")
+        operators
       };
       
       const response = await fetch('http://localhost:5000/api/save-workflow', {
@@ -898,7 +896,10 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(workflow)
+        body: JSON.stringify({
+          function_name: projectInfo?.function_name,
+          operators:workflow
+        })
       });
       
       if (!response.ok) {
@@ -908,7 +909,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       const result = await response.json();
       console.log('Workflow saved:', result);
       
-      message.success(`Saved successfully! file: ${result.filename || 'unknown'}`);
+      message.success("Saved successfully!");
       
     } catch (error) {
       console.error('保存工作流失败:', error);
@@ -1004,77 +1005,117 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
 
     });
 
-    message.success(`开始批量运行 ${pendingOperators.length} 个算子`);
+        message.success(`开始批量运行 ${pendingOperators.length} 个算子`);
   };
+
+  // 加载项目数据 (operators, nodes, indeg, edges)
+  const loadProjectData = async (functionName) => {
+    if (!functionName) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/project-data/${functionName}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const projectData = await response.json();
+      
+      // 更新 operators
+      if (projectData.operators) {
+        setOperators(projectData.operators);
+      }
+      
+      // 更新 DAG 数据
+      if (projectData.nodes || projectData.edges) {
+        setDagData({
+          nodes: projectData.nodes || [],
+          edges: projectData.edges || {},
+          indeg: projectData.indeg || {}
+        });
+      }
+      
+      console.log('Project data loaded:', projectData);
+    } catch (error) {
+      console.error('加载项目数据失败:', error);
+      message.error('加载项目数据失败: ' + error.message);
+    }
+  };
+
+  // 组件挂载时加载项目数据
+  useEffect(() => {
+    if (projectInfo?.function_name) {
+      loadProjectData(projectInfo.function_name);
+    }
+  }, [projectInfo?.function_name]);
 
   
-  const fetchSavedWorkflows = async () => {
-    try {
-      setLoadingWorkflows(true);
-      const response = await fetch('http://localhost:5000/api/workflows');
+  // const fetchSavedWorkflows = async () => {
+  //   try {
+  //     setLoadingWorkflows(true);
+  //     const response = await fetch('http://localhost:5000/api/workflows');
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
       
-      const workflows = await response.json();
-      setSavedWorkflows(workflows);
-    } catch (error) {
-      console.error('获取列表失败:', error);
-      message.error('获取列表失败: ' + error.message);
-    } finally {
-      setLoadingWorkflows(false);
-    }
-  };
+  //     const workflows = await response.json();
+  //     setSavedWorkflows(workflows);
+  //   } catch (error) {
+  //     console.error('获取列表失败:', error);
+  //     message.error('获取列表失败: ' + error.message);
+  //   } finally {
+  //     setLoadingWorkflows(false);
+  //   }
+  // };
 
-  // 加载指定的工作流
-  const loadWorkflow = async (filename) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/workflows/${filename}`);
+  // // 加载指定的工作流
+  // const loadWorkflow = async (filename) => {
+  //   try {
+  //     const response = await fetch(`http://localhost:5000/api/workflows/${filename}`);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
       
-      const workflowData = await response.json();
+  //     const workflowData = await response.json();
       
-      if (workflowData.operators) {
-        setOperators(workflowData.operators);
-        message.success(`"${filename}" load successfully！`);
-        setLoadModalVisible(false);
-      } else {
-        message.error('工作流数据格式错误');
-      }
-    } catch (error) {
-      console.error('加载工作流失败:', error);
-      message.error('加载工作流失败: ' + error.message);
-    }
-  };
+  //     if (workflowData.operators) {
+  //       setOperators(workflowData.operators);
+  //       message.success(`"${filename}" load successfully！`);
+  //       setLoadModalVisible(false);
+  //     } else {
+  //       message.error('工作流数据格式错误');
+  //     }
+  //   } catch (error) {
+  //     console.error('加载工作流失败:', error);
+  //     message.error('加载工作流失败: ' + error.message);
+  //   }
+  // };
 
-  // 删除工作流
-  const deleteWorkflow = async (filename) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/workflows/${filename}`, {
-        method: 'DELETE'
-      });
+  // // 删除工作流
+  // const deleteWorkflow = async (filename) => {
+  //   try {
+  //     const response = await fetch(`http://localhost:5000/api/workflows/${filename}`, {
+  //       method: 'DELETE'
+  //     });
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
       
-      message.success(`"${filename}" delete successfully！`);
-      fetchSavedWorkflows(); // 重新获取列表
-    } catch (error) {
-      console.error('删除工作流失败:', error);
-      message.error('删除工作流失败: ' + error.message);
-    }
-  };
+  //     message.success(`"${filename}" delete successfully！`);
+  //     fetchSavedWorkflows(); // 重新获取列表
+  //   } catch (error) {
+  //     console.error('删除工作流失败:', error);
+  //     message.error('删除工作流失败: ' + error.message);
+  //   }
+  // };
 
-  // 显示加载工作流对话框
-  const handleLoadWorkflow = () => {
-    setLoadModalVisible(true);
-    fetchSavedWorkflows();
-  };
+  // // 显示加载工作流对话框
+  // const handleLoadWorkflow = () => {
+  //   setLoadModalVisible(true);
+  //   fetchSavedWorkflows();
+  // };
 
 
 
@@ -1133,13 +1174,6 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
                 disabled={operators.filter(op => op.status === 'pending' || op.status === 'enabled').length === 0}
               >
                 Run All
-              </Button>
-              <Button 
-                size="small"
-                icon={<FolderOpenOutlined />}
-                onClick={handleLoadWorkflow}
-              >
-                Load
               </Button>
               <Button 
                 size="small"
@@ -1205,7 +1239,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         <div className="operators-dag">
           <OperatorDAG
             operators={operators}
-            dagData={{
+            dagData={dagData || {
               "nodes": [
                 {
                   "id": "1",
@@ -1247,62 +1281,6 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           />
         </div>
       )}
-
-      {/* 加载工作流模态框 */}
-      <Modal
-        title="Load the saved operators"
-        open={loadModalVisible}
-        onCancel={() => setLoadModalVisible(false)}
-        footer={null}
-        width={600}
-      >
-        <List
-          loading={loadingWorkflows}
-          dataSource={savedWorkflows}
-          renderItem={(workflow) => (
-            <List.Item
-              actions={[
-                <Button 
-                  type="primary" 
-                  size="small"
-                  onClick={() => loadWorkflow(workflow.filename)}
-                >
-                  load
-                </Button>,
-                <Button 
-                  danger 
-                  size="small"
-                  onClick={() => {
-                    Modal.confirm({
-                      title: 'Confirm Delete',
-                      content: `Sure to delete "${workflow.name}"?`,
-                      onOk: () => deleteWorkflow(workflow.filename)
-                    });
-                  }}
-                >
-                  delete
-                </Button>
-              ]}
-            >
-              <List.Item.Meta
-                title={workflow.name}
-                description={
-                  <Space direction="vertical" size="small">
-                    <Text type="secondary">
-                      modification time: {workflow.modified_time}
-                    </Text>
-                    <Text type="secondary">
-                      operator number: {workflow.operators_count} | document number: {workflow.documents_count}
-                    </Text>
-
-                  </Space>
-                }
-              />
-            </List.Item>
-          )}
-          locale={{ emptyText: 'Not available' }}
-        />
-      </Modal>
 
       {/* 索引选择模态框 */}
       <IndexSelectionModal

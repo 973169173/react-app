@@ -334,6 +334,114 @@ def search_projects():
     except Exception as e:
         return jsonify({'error': f'搜索项目失败: {str(e)}'}), 500
 
+@app.route('/api/project-data/<function_name>', methods=['GET'])
+def get_project_data(function_name):
+    """获取项目的operators, nodes, indeg, edges数据"""
+    try:
+        # 写死的测试数据，您可以根据function_name返回不同的数据
+        project_data = {
+            'operators': [
+                {
+                    'id': '1',
+                    'name': 'test_retrieve',
+                    'type': 'Retrieve',
+                    'model': 'gpt-4o',
+                    'status': 'enabled',
+                    'output': None,
+                    'collapsed': False,
+                    'parameters': {
+                        'tablename': 'documents',
+                        'columns': [
+                            {'columnname': 'name', 'description': 'name'},
+                            {'columnname': 'content', 'description': 'document content'}
+                        ]
+                    }
+                },
+                {
+                    'id': '2',
+                    'name': 'test_extract',
+                    'type': 'Extract',
+                    'model': 'gpt-4o',
+                    'status': 'pending',
+                    'output': None,
+                    'collapsed': False,
+                    'parameters': {
+                        'tablename': 'results',
+                        'columns': [
+                            {'columnname': 'age', 'description': 'age'},
+                            {'columnname': 'occupation', 'description': 'job or occupation'}
+                        ]
+                    }
+                },
+                {
+                    'id': '3',
+                    'name': 'test_filter',
+                    'type': 'filter',
+                    'model': 'gpt-4o',
+                    'status': 'pending',
+                    'output': None,
+                    'collapsed': False,
+                    'parameters': {
+                        'tablename': 'filtered_results',
+                        'columns': [
+                            {'columnname': 'result', 'description': 'filtered result'}
+                        ],
+                        'condition': 'age > 18'
+                    }
+                }
+            ],
+            'nodes': [
+                {
+                    'id': '1',
+                    'type': 'Retrieve',
+                    'parameters': {
+                        'tablename': 'documents',
+                        'columns': [
+                            {'columnname': 'name', 'description': 'name'},
+                            {'columnname': 'content', 'description': 'document content'}
+                        ]
+                    }
+                },
+                {
+                    'id': '2',
+                    'type': 'Extract',
+                    'parameters': {
+                        'tablename': 'results',
+                        'columns': [
+                            {'columnname': 'age', 'description': 'age'},
+                            {'columnname': 'occupation', 'description': 'job or occupation'}
+                        ]
+                    }
+                },
+                {
+                    'id': '3',
+                    'type': 'filter',
+                    'parameters': {
+                        'tablename': 'filtered_results',
+                        'columns': [
+                            {'columnname': 'result', 'description': 'filtered result'}
+                        ],
+                        'condition': 'age > 18'
+                    }
+                }
+            ],
+            'edges': {
+                '1': ['2'],
+                '2': ['3'],
+                '3': []
+            },
+            'indeg': {
+                '1': 0,
+                '2': 1,
+                '3': 1
+            }
+        }
+        
+        return jsonify(project_data)
+        
+    except Exception as e:
+        return jsonify({'error': f'获取项目数据失败: {str(e)}'}), 500
+
 @app.route('/api/indexes', methods=['GET'])
 def get_indexes():
     """获取可用的索引列表"""
@@ -458,154 +566,6 @@ def save_index_selection():
 
 
 #save/load相关
-
-@app.route('/api/save-workflow', methods=['POST'])
-def save_workflow():
-    try:
-        workflow_data = request.json
-        
-        if not workflow_data:
-            return jsonify({'error': '没有收到工作流数据'}), 400
-        
-        # 生成文件名（使用时间戳）
-        timestamp = workflow_data.get('timestamp', time.strftime('%Y%m%d_%H%M%S'))
-        filename = f"workflow_{timestamp.replace(':', '-').replace('T', '_').split('.')[0]}.json"
-        
-        # 保存到data目录
-        file_path = os.path.join(app.config['DATA_FOLDER'], filename)
-        
-        # 写入JSON文件
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(workflow_data, f, ensure_ascii=False, indent=2)
-        
-        return jsonify({
-            'message': 'Saved successfully',
-            'filename': filename,
-            'path': file_path,
-            'operators_count': len(workflow_data.get('operators', [])),
-            'documents_count': len(workflow_data.get('documents', []))
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'保存工作流失败: {str(e)}'}), 500
-
-@app.route('/api/workflows', methods=['GET'])
-def get_workflows():
-    try:
-        workflows = []
-        data_folder = app.config['DATA_FOLDER']
-        
-        if os.path.exists(data_folder):
-            for filename in os.listdir(data_folder):
-                if filename.endswith('.json') and filename.startswith('workflow_'):
-                    file_path = os.path.join(data_folder, filename)
-                    if os.path.isfile(file_path):
-                        # 获取文件信息
-                        file_size = os.path.getsize(file_path)
-                        modified_time = time.strftime('%Y-%m-%d %H:%M:%S', 
-                                                    time.localtime(os.path.getmtime(file_path)))
-                        
-                        # 尝试读取workflow基本信息
-                        try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                workflow_data = json.load(f)
-                                operators_count = len(workflow_data.get('operators', []))
-                                documents_count = len(workflow_data.get('documents', []))
-                        except:
-                            operators_count = 0
-                            documents_count = 0
-                        
-                        workflows.append({
-                            'filename': filename,
-                            'name': filename.replace('workflow_', '').replace('.json', ''),
-                            'size': file_size,
-                            'modified_time': modified_time,
-                            'operators_count': operators_count,
-                            'documents_count': documents_count
-                        })
-        
-        # 按修改时间倒序排列
-        workflows.sort(key=lambda x: x['modified_time'], reverse=True)
-        return jsonify(workflows)
-        
-    except Exception as e:
-        return jsonify({'error': f'获取工作流列表失败: {str(e)}'}), 500
-
-@app.route('/api/workflows/<filename>', methods=['GET'])
-def get_workflow(filename):
-    try:
-        # 确保文件名安全
-        if not filename.endswith('.json') or not filename.startswith('workflow_'):
-            return jsonify({'error': '无效的工作流文件名'}), 400
-        
-        file_path = os.path.join(app.config['DATA_FOLDER'], filename)
-        
-        if not os.path.exists(file_path):
-            return jsonify({'error': '工作流文件不存在'}), 404
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
-            workflow_data = json.load(f)
-        
-        return jsonify(workflow_data)
-        
-    except Exception as e:
-        return jsonify({'error': f'读取工作流失败: {str(e)}'}), 500
-
-@app.route('/api/workflows/<filename>', methods=['DELETE'])
-def delete_workflow(filename):
-    try:
-        # 确保文件名安全
-        if not filename.endswith('.json') or not filename.startswith('workflow_'):
-            return jsonify({'error': '无效的工作流文件名'}), 400
-        
-        file_path = os.path.join(app.config['DATA_FOLDER'], filename)
-        
-        if not os.path.exists(file_path):
-            return jsonify({'error': '工作流文件不存在'}), 404
-        
-        os.remove(file_path)
-        return jsonify({'message': f'工作流 {filename} 删除成功'})
-        
-    except Exception as e:
-        return jsonify({'error': f'删除工作流失败: {str(e)}'}), 500
-
-@app.route('/api/workflow/latest', methods=['GET'])
-def latest_workflow():
-    try:
-        data_folder = app.config['DATA_FOLDER']
-        
-        if not os.path.exists(data_folder):
-            return jsonify({'error': '数据目录不存在'}), 404
-        
-        # 获取所有workflow文件
-        workflow_files = []
-        for filename in os.listdir(data_folder):
-            if filename.endswith('.json') and filename.startswith('workflow_'):
-                file_path = os.path.join(data_folder, filename)
-                file_stat = os.stat(file_path)
-                workflow_files.append({
-                    'filename': filename,
-                    'modified_time': file_stat.st_mtime
-                })
-        
-        if not workflow_files:
-            return jsonify({'error': '没有找到工作流文件'}), 404
-        
-        # 按修改时间排序，获取最新的
-        latest_file = max(workflow_files, key=lambda x: x['modified_time'])
-        file_path = os.path.join(data_folder, latest_file['filename'])
-        
-        # 读取最新的workflow文件
-        with open(file_path, 'r', encoding='utf-8') as f:
-            workflow_data = json.load(f)
-        
-        # 添加版本标识
-        workflow_data['version'] = 1
-        
-        return jsonify(workflow_data)
-        
-    except Exception as e:
-        return jsonify({'error': f'获取最新工作流失败: {str(e)}'}), 500
 
 @app.route('/api/save-sql', methods=['POST'])
 def save_sql():
