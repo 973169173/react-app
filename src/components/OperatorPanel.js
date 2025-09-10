@@ -640,7 +640,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     const newOperator = {
       id: Date.now().toString(),
       name: `test_${operators.length + 1}`,
-      type: 'extract',
+      type: 'Extract',
       prompt: '',
       model: 'gpt-4o',
       status: 'pending',
