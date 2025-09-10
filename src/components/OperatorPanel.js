@@ -117,11 +117,11 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
 
 // 算子参数配置
 const OPERATOR_PARAMETERS = {
-  extract: [
+  Extract: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
     { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' }
   ],
-  filter: [
+  Filter: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
     { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' },
     { key: 'condition', label: 'Filter Condition', type: 'input' ,placeholder:'condition'},
@@ -412,8 +412,8 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
               style={{ width: '100%', marginTop: 4 }}
               size="small"
             >
-              <Option value="extract">Extract</Option>
-              <Option value="filter">Filter</Option>
+              <Option value="Extract">Extract</Option>
+              <Option value="Filter">Filter</Option>
               <Option value="Retrieve">Retrieve</Option>
               <Option value="Aggregation">Aggregation</Option>
               <Option value="Join">Join</Option>
@@ -1226,39 +1226,41 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         <div className="operators-dag">
           <OperatorDAG
             operators={operators}
-            dagData={dagData || {
-              "nodes": [
-                {
-                  "id": "1",
-                  "type": "Retrieve",
-                  "parameters": { 
-                    "tablename": "documents",
-                    "columns": [
-                      {"columnname": "name", "description": "name"}
-                    ]
-                  }
-                },
-                {
-                  "id": "2", 
-                  "type": "Extract",
-                  "parameters": { 
-                    "tablename": "results",
-                    "columns": [
-                      {"columnname": "age", "description": "age"}
-                    ]
-                  }
-                },
-                {
-                  "id": "3", 
-                  "type": "Extract",
-                },
+              dagData={dagData
+              //   || {
+              // "nodes": [
+              //   {
+              //     "id": "1",
+              //     "type": "Retrieve",
+              //     "parameters": { 
+              //       "tablename": "documents",
+              //       "columns": [
+              //         {"columnname": "name", "description": "name"}
+              //       ]
+              //     }
+              //   },
+              //   {
+              //     "id": "2", 
+              //     "type": "Extract",
+              //     "parameters": { 
+              //       "tablename": "results",
+              //       "columns": [
+              //         {"columnname": "age", "description": "age"}
+              //       ]
+              //     }
+              //   },
+              //   {
+              //     "id": "3", 
+              //     "type": "Extract",
+              //   },
                 
-              ],
-              "edges": {
-                "1": ["2","3"],
+              // ],
+              // "edges": {
+              //   "1": ["2","3"],
 
+              // }
+              // }
               }
-            }}
             onNodeClick={(nodeData) => {
               // 处理节点点击事件，可以显示详细信息或执行操作
               console.log('DAG Node clicked:', nodeData);

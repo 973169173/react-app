@@ -362,7 +362,7 @@ def get_project_data(function_name):
                     'name': 'test_extract',
                     'type': 'Extract',
                     'model': 'gpt-4o',
-                    'status': 'pending',
+                    'status': 'enabled',
                     'output': None,
                     'collapsed': False,
                     'parameters': {
@@ -376,9 +376,9 @@ def get_project_data(function_name):
                 {
                     'id': '3',
                     'name': 'test_filter',
-                    'type': 'filter',
+                    'type': 'Filter',
                     'model': 'gpt-4o',
-                    'status': 'pending',
+                    'status': 'enabled',
                     'output': None,
                     'collapsed': False,
                     'parameters': {

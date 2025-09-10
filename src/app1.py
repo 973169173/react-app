@@ -338,7 +338,7 @@ def get_project_data(foname):
     """获取项目的operators, nodes, indeg, edges数据"""
     try:
         project_data=fun.get_project_info(foname)
-        
+        print(project_data)
         
         return jsonify(project_data)
         
@@ -419,7 +419,7 @@ def save_workflow():
         
         workflow_data = request.json.get("operators")
         foname=request.json.get("function_name")
-        print(foname,"save")
+        print(workflow_data,"save")
         if not workflow_data:
             return jsonify({'error': '没有收到工作流数据'}), 400
         
