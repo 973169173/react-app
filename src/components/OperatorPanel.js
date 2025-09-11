@@ -689,7 +689,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       
       // 更新本地的 projectInfo
       if (projectInfo) {
-        projectInfo.function_name = functionName;
+        projectInfo.new_function_name = functionName;
       }
       
     } catch (error) {
@@ -733,7 +733,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         return index ? index.name : id;
       });
 
-      if (operator.type === 'extract') {
+      if (operator.type === 'Extract') {
         response = await fetch('http://localhost:5000/api/extract', {
           method: 'POST',
           headers: {
@@ -744,12 +744,12 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null,
+            function_name: projectInfo?.new_function_name || null,
             selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
       }
-      else if (operator.type ==='filter') {
+      else if (operator.type ==='Filter') {
         response = await fetch('http://localhost:5000/api/filter', {
           method: 'POST',
           headers: {
@@ -760,7 +760,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null,
+            function_name: projectInfo?.new_function_name || null,
             selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
@@ -776,7 +776,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             prompt: operator.prompt,
             model: operator.model,
             parameters: processedParameters,
-            function_name: projectInfo?.function_name || null,
+            function_name: projectInfo?.new_function_name || null,
             selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })
         });
@@ -790,7 +790,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       
       // 如果返回了 function_name，更新项目信息并保存到 projects.json
 
-      //await updateProjectFunctionName(data.function_name);
+      await updateProjectFunctionName(data.function_name);
       console.log(projectInfo)
       setOperators(prev => prev.map(op => 
         op.id === id ? { 
@@ -849,7 +849,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          function_name: projectInfo?.function_name || null,
+          function_name: projectInfo?.new_function_name || null,
           selected_indexes: selectedIndexNames // 传递名称列表而不是ID
         })
       });
@@ -947,7 +947,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         delete processedParameters.columns;
       }
       
-      if (operator.type === 'extract') {
+      if (operator.type === 'Extract') {
         response = await fetch('http://localhost:5000/api/extract', {
           method: 'POST',
           headers: {
@@ -962,7 +962,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           })
         });
       }
-      else if (operator.type ==='filter') {
+      else if (operator.type ==='Filter') {
         response = await fetch('http://localhost:5000/api/filter', {
           method: 'POST',
           headers: {
@@ -1227,39 +1227,39 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           <OperatorDAG
             operators={operators}
               dagData={dagData
-              //   || {
-              // "nodes": [
-              //   {
-              //     "id": "1",
-              //     "type": "Retrieve",
-              //     "parameters": { 
-              //       "tablename": "documents",
-              //       "columns": [
-              //         {"columnname": "name", "description": "name"}
-              //       ]
-              //     }
-              //   },
-              //   {
-              //     "id": "2", 
-              //     "type": "Extract",
-              //     "parameters": { 
-              //       "tablename": "results",
-              //       "columns": [
-              //         {"columnname": "age", "description": "age"}
-              //       ]
-              //     }
-              //   },
-              //   {
-              //     "id": "3", 
-              //     "type": "Extract",
-              //   },
+                || {
+              "nodes": [
+                {
+                  "id": "1",
+                  "type": "Retrieve",
+                  "parameters": { 
+                    "tablename": "documents",
+                    "columns": [
+                      {"columnname": "name", "description": "name"}
+                    ]
+                  }
+                },
+                {
+                  "id": "2", 
+                  "type": "Extract",
+                  "parameters": { 
+                    "tablename": "results",
+                    "columns": [
+                      {"columnname": "age", "description": "age"}
+                    ]
+                  }
+                },
+                {
+                  "id": "3", 
+                  "type": "Extract",
+                },
                 
-              // ],
-              // "edges": {
-              //   "1": ["2","3"],
+              ],
+              "edges": {
+                "1": ["2","3"],
 
-              // }
-              // }
+              }
+              }
               }
             onNodeClick={(nodeData) => {
               // 处理节点点击事件，可以显示详细信息或执行操作

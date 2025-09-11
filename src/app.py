@@ -188,6 +188,7 @@ def create_project():
             'id': project_id,
             'name': project_data['project_name'],
             'function_name': function_name,
+            'new_function_name': function_name,
             'description': project_data.get('description', ''),
             'index_name': project_data.get('index_name', ''),
             'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -342,7 +343,7 @@ def get_project_data(function_name):
         project_data = {
             'operators': [
                 {
-                    'id': '1',
+                    'id': 1,
                     'name': 'test_retrieve',
                     'type': 'Retrieve',
                     'model': 'gpt-4o',
@@ -358,7 +359,7 @@ def get_project_data(function_name):
                     }
                 },
                 {
-                    'id': '2',
+                    'id': 2,
                     'name': 'test_extract',
                     'type': 'Extract',
                     'model': 'gpt-4o',
@@ -374,7 +375,7 @@ def get_project_data(function_name):
                     }
                 },
                 {
-                    'id': '3',
+                    'id': 3,
                     'name': 'test_filter',
                     'type': 'Filter',
                     'model': 'gpt-4o',
@@ -392,7 +393,7 @@ def get_project_data(function_name):
             ],
             'nodes': [
                 {
-                    'id': '1',
+                    'id': 1,
                     'type': 'Retrieve',
                     'parameters': {
                         'tablename': 'documents',
@@ -403,7 +404,7 @@ def get_project_data(function_name):
                     }
                 },
                 {
-                    'id': '2',
+                    'id': 2,
                     'type': 'Extract',
                     'parameters': {
                         'tablename': 'results',
@@ -414,7 +415,7 @@ def get_project_data(function_name):
                     }
                 },
                 {
-                    'id': '3',
+                    'id': 3,
                     'type': 'filter',
                     'parameters': {
                         'tablename': 'filtered_results',
@@ -426,14 +427,14 @@ def get_project_data(function_name):
                 }
             ],
             'edges': {
-                '1': ['2'],
-                '2': ['3'],
-                '3': []
+                1: [2],
+                2: [3],
+                3: []
             },
             'indeg': {
-                '1': 0,
-                '2': 1,
-                '3': 1
+                1: 0,
+                2: 1,
+                3: 1
             }
         }
         

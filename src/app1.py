@@ -214,6 +214,7 @@ def create_project():
             'id': project_id,
             'name': project_data['project_name'],
             'function_name': foname,
+            'new_function_name': foname,
             'description': project_data.get('description', ''),
             'index_name': project_data.get('index_name', ''),
             'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -286,7 +287,7 @@ def update_project(project_id):
             project['index_name'] = project_data['index_name']
         
         if 'function_name' in project_data:
-            project['function_name'] = project_data['function_name']
+            project['new_function_name'] = project_data['function_name']
         
         if 'status' in project_data:
             project['status'] = project_data['status']
@@ -367,7 +368,7 @@ def get_existindexes():
     """获取已有的的索引列表"""
     try:
         function_name = request.args.get('function_name', '')
-        indexes =fun.get_exist_indexer_name(function_name)
+        indexes =fun.get_database_indexer_name_list()
         #indexes=["111","222","333"]
         return jsonify({
             'indexes': indexes,
