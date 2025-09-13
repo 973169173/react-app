@@ -1,5 +1,7 @@
 .prompt-studio {
   background: #f0f2f5;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -18,6 +20,7 @@
 .main-content {
   padding: 0;
   background: #f0f2f5;
+  height: 100vh;
 }
 
 /* Project Page Styles */
@@ -42,10 +45,11 @@
 
 .content-wrapper {
   display: flex;
-  height: calc(100vh - 32px);
+  height: 100vh;
   gap: 20px;
   padding: 16px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .operators-section {
@@ -56,6 +60,7 @@
   padding: 16px;
   overflow-y: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: calc(100vh - 32px);
 }
 
 .operators-header {
@@ -137,6 +142,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: calc(100vh - 32px);
 }
 
 .documents-header {
@@ -191,7 +197,7 @@
   
   .documents-section {
     width: 100%;
-    max-height: 300px;
+    height: 300px;
   }
 }
 
@@ -391,6 +397,7 @@
   padding: 16px;
   overflow-y: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: calc(100vh - 32px);
 }
 
 .sql-header {
@@ -420,6 +427,7 @@
   padding: 16px;
   overflow-y: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  height: calc(100vh - 32px);
 }
 
 .nl-header {
@@ -550,15 +558,16 @@
 @media (max-width: 1200px) {
   .content-wrapper {
     flex-direction: column;
-    height: auto;
-    min-height: calc(100vh - 32px);
+    height: 100vh;
+    overflow-y: auto;
+    gap: 16px;
   }
   
   .documents-section {
     width: 100%;
     min-width: 100%;
     max-width: 100%;
-    max-height: 400px;
+    height: 400px;
     order: 2;
   }
   
@@ -566,11 +575,19 @@
   .sql-section,
   .nl-section {
     min-width: auto;
+    height: auto;
+    min-height: 500px;
     order: 1;
+    flex: none;
   }
 }
 
 @media (max-width: 768px) {
+  .content-wrapper {
+    padding: 12px;
+    gap: 12px;
+  }
+  
   .operators-header,
   .sql-header,
   .nl-header {

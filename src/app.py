@@ -395,6 +395,8 @@ def get_project_data(function_name):
                 {
                     'id': 1,
                     'type': 'Retrieve',
+                    "executionTime": 2313,
+                    "tokenUsage": 23123,
                     'parameters': {
                         'tablename': 'documents',
                         'columns': [
@@ -406,6 +408,8 @@ def get_project_data(function_name):
                 {
                     'id': 2,
                     'type': 'Extract',
+                    "executionTime": 2313,
+                    "tokenUsage": 623280,
                     'parameters': {
                         'tablename': 'results',
                         'columns': [
@@ -417,6 +421,8 @@ def get_project_data(function_name):
                 {
                     'id': 3,
                     'type': 'filter',
+                    "executionTime": 4334432,
+                    "tokenUsage": 432424,
                     'parameters': {
                         'tablename': 'filtered_results',
                         'columns': [

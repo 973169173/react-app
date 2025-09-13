@@ -174,7 +174,7 @@ const OperatorNode = ({ data, isConnectable }) => {
               }}>
                 <ThunderboltOutlined style={{ color: '#52c41a', marginRight: 4, fontSize: '10px' }} />
                 <Text style={{ fontSize: '10px', color: '#52c41a', fontWeight: 'bold' }}>
-                  {data.executionTime}ms
+                  {data.executionTime}s
                 </Text>
               </div>
             )}
@@ -203,52 +203,12 @@ const nodeTypes = {
   const [selectedNode, setSelectedNode] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  console.log('OperatorDAG - dagData:', dagData);
-  console.log('OperatorDAG - operators:', operators);  
-  // 生成模拟的性能数据
-  const generateMockPerformanceData = useCallback((operator) => {
-    // 根据操作符类型生成不同的基准数据
-    const typeBaselines = {
-      'extract': { baseTokens: 800, baseTime: 2000 },
-      'filter': { baseTokens: 400, baseTime: 1200 },
-      'Retrieve': { baseTokens: 600, baseTime: 1500 },
-      'Aggregation': { baseTokens: 300, baseTime: 800 },
-      'Join': { baseTokens: 500, baseTime: 1800 },
-      'Sort': { baseTokens: 200, baseTime: 600 },
-      'Group': { baseTokens: 350, baseTime: 900 },
-      'Projection': { baseTokens: 150, baseTime: 400 },
-    };
-
-    const baseline = typeBaselines[operator.type] || { baseTokens: 500, baseTime: 1000 };
-    
-    // 添加随机变化 ±30%
-    const variance = 0.3;
-    const tokenVariance = 1 + (Math.random() - 0.5) * variance;
-    const timeVariance = 1 + (Math.random() - 0.5) * variance;
-
-    const mockData = {
-      executionTime: Math.round(baseline.baseTime * timeVariance),
-      tokenUsage: Math.round(baseline.baseTokens * tokenVariance),
-    };
-
-    // 根据算子状态调整数据
-    if (operator.status === 'running') {
-      mockData.executionTime = null;
-      mockData.tokenUsage = null;
-    } else if (operator.status === 'pending') {
-      mockData.executionTime = null;
-      mockData.tokenUsage = null;
-    } else if (operator.status === 'error') {
-      mockData.executionTime = null;
-      mockData.tokenUsage = 0;
-    }
-
-    return mockData;
-  }, []);
+  // console.log('OperatorDAG - dagData:', dagData);
+  // console.log('OperatorDAG - operators:', operators);
 
   // 构建层次化布局的辅助函数
   const buildHierarchicalLayout = useCallback((dagData) => {
-    console.log('buildHierarchicalLayout:', dagData);
+    //console.log('buildHierarchicalLayout:', dagData);
     if (!dagData || !dagData.nodes || !dagData.edges || typeof dagData.edges !== 'object') {
       return { nodePositions: {}, maxDepth: 0 };
     }
@@ -309,7 +269,7 @@ const nodeTypes = {
     while (queue.length > 0) {
       const levelSize = queue.length;
       const currentLevelNodes = [];
-      console.log('Current Level:', currentLevel, 'Nodes:', queue);
+      //console.log('Current Level:', currentLevel, 'Nodes:', queue);
       for (let i = 0; i < levelSize; i++) {
         const node = queue.shift();
         currentLevelNodes.push(node);
@@ -357,29 +317,10 @@ const nodeTypes = {
     return { nodePositions, maxDepth };
   }, []);
 
-  // 将操作符转换为节点（使用真实的DAG数据）
+  // 将 DAG 数据转换为节点（直接使用 dagData.nodes 信息）
   const generateNodesFromDAG = useCallback(() => {
     if (!dagData || !dagData.nodes) {
-      // 如果没有DAG数据，回退到简单布局
-      return operators.map((operator, index) => {
-        const performanceData = generateMockPerformanceData(operator);
-        const nodeId = String(operator.id); // 确保ID是字符串类型
-        
-        return {
-          id: nodeId, // 使用字符串类型的ID
-          type: 'operatorNode',
-          position: { 
-            x: (index % 3) * 250 + 100, 
-            y: Math.floor(index / 3) * 150 + 100 
-          },
-          data: {
-            ...operator,
-            id: nodeId, // 确保data中的id也是字符串
-            ...performanceData,
-          },
-          draggable: true,
-        };
-      });
+      return [];
     }
 
     // 处理nodes数据结构 - 可能是数组或对象
@@ -399,56 +340,37 @@ const nodeTypes = {
     const { nodePositions } = buildHierarchicalLayout(dagData);
     
     return nodesArray.map((dagNode) => {
-      // 找到对应的operator数据
       const nodeId = String(dagNode.id); // 确保ID是字符串类型
-      const operator = operators.find(op => String(op.id) === nodeId) || {
-        id: nodeId,
-        name: `NODE-${dagNode.id}`,
-        type: dagNode.type || 'Unknown',
-        status: 'enabled',
-        model: 'default',
-        parameters: dagNode.parameters || {}
-      };
-
-      const performanceData = generateMockPerformanceData(operator);
       const position = nodePositions[nodeId] || { x: 100, y: 100 };
+
+      // 直接使用 DAG 节点数据，设置默认值
+      const nodeData = {
+        id: nodeId,
+        name: dagNode.name || `Node-${dagNode.id}`,
+        type: dagNode.type || 'Unknown',
+        status: dagNode.status || 'enabled',
+        model: dagNode.parameters.model || 'default',
+        parameters: dagNode.parameters || {},
+        // 使用真实的性能数据（如果存在）
+        executionTime: dagNode.parameters.time || '0',
+        tokenUsage: dagNode.tokenUsage || '0',
+      };
 
       return {
         id: nodeId, // 使用字符串类型的ID
         type: 'operatorNode',
         position,
-        data: {
-          ...operator,
-          id: nodeId, // 确保data中的id也是字符串
-          ...performanceData,
-          // 合并DAG节点的参数
-          parameters: { ...operator.parameters, ...dagNode.parameters },
-        },
+        data: nodeData,
         draggable: true,
       };
     });
-  }, [operators, dagData, generateMockPerformanceData, buildHierarchicalLayout]);
+  }, [dagData, buildHierarchicalLayout]);
 
   // 从DAG数据生成边连接
   const generateEdgesFromDAG = useCallback(() => {
-    // if (!dagData || !dagData.edges || typeof dagData.edges !== 'object') {
-    //   // 如果没有DAG数据，回退到简单的序列连接
-    //   const edges = [];
-    //   for (let i = 0; i < operators.length - 1; i++) {
-    //     const sourceId = String(operators[i].id); // 确保转换为字符串
-    //     const targetId = String(operators[i + 1].id); // 确保转换为字符串
-        
-    //     edges.push({
-    //       id: `e${sourceId}-${targetId}`, // 使用字符串拼接
-    //       source: sourceId, // 使用字符串类型
-    //       target: targetId, // 使用字符串类型
-    //       type: 'smoothstep',
-    //       style: { stroke: '#999', strokeWidth: 2 },
-    //       animated: operators[i].status === 'running' || operators[i + 1].status === 'running',
-    //     });
-    //   }
-    //   return edges;
-    // }
+    if (!dagData || !dagData.edges || typeof dagData.edges !== 'object') {
+      return [];
+    }
 
     // 使用DAG数据构建真实的边连接
     const edges = [];
@@ -458,12 +380,18 @@ const nodeTypes = {
       targets.forEach((target, index) => {
         const targetStr = String(target); // 确保转换为字符串
         
-        // 检查源节点状态来决定是否显示动画
-        const sourceOperator = operators.find(op => String(op.id) === sourceStr);
-        const targetOperator = operators.find(op => String(op.id) === targetStr);
+        // 检查节点状态来决定是否显示动画（从 dagData.nodes 中获取）
+        let sourceNode = null;
+        let targetNode = null;
         
-        const isAnimated = sourceOperator?.status === 'running' || 
-                          targetOperator?.status === 'running';
+        if (dagData.nodes) {
+          const nodesArray = Array.isArray(dagData.nodes) ? dagData.nodes : Object.values(dagData.nodes);
+          sourceNode = nodesArray.find(node => String(node.id) === sourceStr);
+          targetNode = nodesArray.find(node => String(node.id) === targetStr);
+        }
+        
+        const isAnimated = sourceNode?.status === 'running' || 
+                          targetNode?.status === 'running';
         
         edges.push({
           id: `e${sourceStr}-${targetStr}-${index}`, // 使用字符串拼接
@@ -484,59 +412,23 @@ const nodeTypes = {
     });
 
     return edges;
-  }, [dagData, operators]);
-
-  // 将操作符转换为节点
-  const generateNodesFromOperators = useCallback(() => {
-    return operators.map((operator, index) => {
-      const performanceData = generateMockPerformanceData(operator);
-      const nodeId = String(operator.id); // 确保ID是字符串类型
-      
-      return {
-        id: nodeId, // 使用字符串类型的ID
-        type: 'operatorNode',
-        position: { 
-          x: (index % 3) * 250 + 100, 
-          y: Math.floor(index / 3) * 150 + 100 
-        },
-        data: {
-          ...operator,
-          id: nodeId, // 确保data中的id也是字符串
-          ...performanceData,
-        },
-        draggable: true,
-      };
-    });
-  }, [operators, generateMockPerformanceData]);
-
-  // 生成边连接（简单的序列连接）
-  const generateEdgesFromOperators = useCallback(() => {
-    const edges = [];
-    for (let i = 0; i < operators.length - 1; i++) {
-      const sourceId = String(operators[i].id); // 确保转换为字符串
-      const targetId = String(operators[i + 1].id); // 确保转换为字符串
-      
-      edges.push({
-        id: `e${sourceId}-${targetId}`, // 使用字符串拼接
-        source: sourceId, // 使用字符串类型
-        target: targetId, // 使用字符串类型
-        type: 'smoothstep',
-        style: { stroke: '#999', strokeWidth: 2 },
-        animated: operators[i].status === 'running' || operators[i + 1].status === 'running',
-      });
-    }
-    return edges;
-  }, [operators]);
+  }, [dagData]);
 
   // 更新节点和边
   useEffect(() => {
-    // 优先使用DAG数据，如果没有则使用operators数据
-    const newNodes = dagData ? generateNodesFromDAG() : generateNodesFromOperators();
-    const newEdges = dagData ? generateEdgesFromDAG() : generateEdgesFromOperators();
+    // 只使用 dagData 来生成节点和边
+    if (!dagData) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    
+    const newNodes = generateNodesFromDAG();
+    const newEdges = generateEdgesFromDAG();
     
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [operators, dagData, generateNodesFromDAG, generateEdgesFromDAG, generateNodesFromOperators, generateEdgesFromOperators, setNodes, setEdges]);
+  }, [dagData, generateNodesFromDAG, generateEdgesFromDAG, setNodes, setEdges]);
 
   // 处理连接
   const onConnect = useCallback(

@@ -1226,41 +1226,56 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         <div className="operators-dag">
           <OperatorDAG
             operators={operators}
-              dagData={dagData
-                || {
+            dagData={dagData || {
               "nodes": [
                 {
                   "id": "1",
+                  "name": "文档检索",
                   "type": "Retrieve",
+                  "status": "completed",
+                  "model": "embedding-v1",
+                  "executionTime": 1420,
+                  "tokenUsage": 680,
                   "parameters": { 
                     "tablename": "documents",
                     "columns": [
-                      {"columnname": "name", "description": "name"}
+                      {"columnname": "name", "description": "文档名称"}
                     ]
                   }
                 },
                 {
-                  "id": "2", 
+                  "id": "2",
+                  "name": "年龄提取", 
                   "type": "Extract",
+                  "status": "running",
+                  "model": "gpt-3.5-turbo",
+                  "executionTime": null,
+                  "tokenUsage": null,
                   "parameters": { 
                     "tablename": "results",
                     "columns": [
-                      {"columnname": "age", "description": "age"}
+                      {"columnname": "age", "description": "提取人员年龄信息"}
                     ]
                   }
                 },
                 {
-                  "id": "3", 
+                  "id": "3",
+                  "name": "数据清洗",
                   "type": "Extract",
-                },
-                
+                  "status": "pending",
+                  "model": "gpt-4",
+                  "executionTime": null,
+                  "tokenUsage": null,
+                  "parameters": {
+                    "filters": ["remove_duplicates", "validate_format"],
+                    "threshold": 0.95
+                  }
+                }
               ],
               "edges": {
-                "1": ["2","3"],
-
+                "1": ["2", "3"]
               }
-              }
-              }
+            }}
             onNodeClick={(nodeData) => {
               // 处理节点点击事件，可以显示详细信息或执行操作
               console.log('DAG Node clicked:', nodeData);
