@@ -13,6 +13,7 @@ import {
   NodeIndexOutlined,
 
 } from '@ant-design/icons';
+import './OperatorPanel.css';
 import OperatorDAG from './OperatorDAG';
 import {
   DndContext,
@@ -118,8 +119,10 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
 // 算子参数配置
 const OPERATOR_PARAMETERS = {
   Extract: [
+    { key: 'mode', label: 'Mode', type: 'select', options: ['basic', 'semantic'], placeholder: 'Select mode' },
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
-    { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' }
+    { key: 'columns', label: 'Columns', type: 'columns', placeholder: 'Add columns' },
+    { key: 'prompt', label: 'Prompt', type: 'textarea', placeholder: 'Enter your prompt here...' }
   ],
   Filter: [
     { key: 'tablename', label: 'Table Name', type: 'input', placeholder: 'tablename' },
@@ -247,6 +250,17 @@ const ParameterInput = ({ parameter, value, onChange }) => {
           ))}
         </Select>
       );
+    case 'textarea':
+      return (
+        <Input.TextArea
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={parameter.placeholder}
+          rows={2}
+          style={{ width: '100%', marginTop: 4 }}
+          size="small"
+        />
+      );
     case 'number':
       return (
         <Input
@@ -346,6 +360,7 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
       style={style}
       className="operator-card"
       size="small"
+      data-status={operator.status}
     >
       <div className="operator-header">
         <div className="operator-info">
@@ -403,8 +418,8 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
       </div>
 
       <div className="operator-content">
-        <Space direction="vertical" style={{ width: '100%' }} size="small">
-          <div>
+        <div className="operator-fields">
+          <div className="operator-field">
             <Text strong>Type:</Text>
             <Select
               value={operator.type}
@@ -423,42 +438,45 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
             </Select>
           </div>
 
-          
-
           {/* 动态参数输入区域 */}
           {OPERATOR_PARAMETERS[operator.type] && (
-            <div>
+            <div className="operator-field">
               <Text strong>Parameters:</Text>
-              <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
-                {OPERATOR_PARAMETERS[operator.type].map((param) => (
-                  <div key={param.key} style={{ marginBottom: 8 }}>
-                    <Text style={{ fontSize: '14px', color: '#000000ff' }}>{param.label}:</Text>
-                    <ParameterInput
-                      parameter={param}
-                      value={operator.parameters?.[param.key] || ''}
-                      onChange={(key, value) => {
-                        const newParameters = { ...(operator.parameters || {}), [key]: value };
-                        onOperatorChange(operator.id, 'parameters', newParameters);
-                      }}
-                    />
-                  </div>
-                ))}
+              <div className="parameters-container">
+                {OPERATOR_PARAMETERS[operator.type]
+                  .filter((param) => {
+                    // 如果是Extract算子，根据mode参数过滤显示的字段
+                    if (operator.type === 'Extract') {
+                      const mode = operator.parameters?.mode || 'basic';
+                      if (mode === 'basic') {
+                        // basic模式显示：mode, tablename, columns
+                        return ['mode', 'tablename', 'columns','prompt'].includes(param.key);
+                      } else if (mode === 'semantic') {
+                        // semantic模式显示：mode, tablename, prompt
+                        return ['mode', 'tablename', 'prompt'].includes(param.key);
+                      }
+                    }
+                    // 其他算子显示所有参数
+                    return true;
+                  })
+                  .map((param) => (
+                    <div key={param.key} className="parameter-item">
+                      <Text className="parameter-label">{param.label}:</Text>
+                      <ParameterInput
+                        parameter={param}
+                        value={operator.parameters?.[param.key] || ''}
+                        onChange={(key, value) => {
+                          const newParameters = { ...(operator.parameters || {}), [key]: value };
+                          onOperatorChange(operator.id, 'parameters', newParameters);
+                        }}
+                      />
+                    </div>
+                  ))}
               </div>
             </div>
           )}
 
-          {/* <div>
-            <Text strong>Prompt:</Text>
-            <TextArea
-              value={operator.prompt}
-              onChange={(e) => onOperatorChange(operator.id, 'prompt', e.target.value)}
-              placeholder="Enter your prompt here..."
-              rows={1}
-              style={{ marginTop: 4 }}
-            />
-          </div> */}
-
-          <div>
+          <div className="operator-field">
             <Text strong>Model:</Text>
             <Select
               value={operator.model}
@@ -473,81 +491,83 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
           </div>
 
           {operator.output && (
-            <Collapse size="small">
-              <Panel header="Output Result" key="1">
-                {(() => {
-                  // 尝试解析为表格数据
-                  try {
-                    const data = JSON.parse(operator.output);
-                    if (Array.isArray(data?.columns) && Array.isArray(data?.data)) {
-                      // 过滤掉以 _ 开头的内部字段
-                      const visibleKeys = data.columns.filter(key => !key.startsWith('_'));
-                      const columns = visibleKeys.map(key => ({
-                        title: key,
-                        dataIndex: key,
-                        key: key,
-                        width: 120,
-                      }));
-                      
-                      const dataSource = data.data.map((arr, i) => {
-                        const obj = {};
-                        data.columns.forEach((k, j) => (obj[k] = arr[j]));
-                        obj.key = data.index?.[i] ?? i;
-                        return obj;
-                      });
+            <div className="operator-field">
+              <Collapse size="small">
+                <Panel header="Output Result" key="1">
+                  {(() => {
+                    // 尝试解析为表格数据
+                    try {
+                      const data = JSON.parse(operator.output);
+                      if (Array.isArray(data?.columns) && Array.isArray(data?.data)) {
+                        // 过滤掉以 _ 开头的内部字段
+                        const visibleKeys = data.columns.filter(key => !key.startsWith('_'));
+                        const columns = visibleKeys.map(key => ({
+                          title: key,
+                          dataIndex: key,
+                          key: key,
+                          width: 120,
+                        }));
+                        
+                        const dataSource = data.data.map((arr, i) => {
+                          const obj = {};
+                          data.columns.forEach((k, j) => (obj[k] = arr[j]));
+                          obj.key = data.index?.[i] ?? i;
+                          return obj;
+                        });
 
-                      return (
-                        <Table
-                          columns={columns}
-                          dataSource={dataSource}
-                          pagination={false}
-                          size="small"
-                          bordered
-                          scroll={{ x: 'max-content' }}
-                          onRow={(record) => ({
-                            onClick: (event) => {
-                              // 获取点击的列
-                              const target = event.target;
-                              let columnKey = null;
-                              
-                              // 尝试从td元素获取data-key属性
-                              const td = target.closest('td');
-                              if (td) {
-                                // 获取列索引
-                                const columnIndex = Array.from(td.parentNode.children).indexOf(td);
-                                // 只从可见列中获取key，排除以_开头的字段
-                                const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                columnKey = visibleKeys[columnIndex];
-                              }
-                              
-                              // 如果没找到，使用第一个可见列作为默认
-                              if (!columnKey) {
-                                const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                columnKey = visibleKeys[0];
-                              }
-                              
-                              //console.log('Clicked column:', columnKey, 'Value:', record[columnKey]);
-                              
-                              if (onRowClick) {
-                                onRowClick(record, columnKey);
-                              }
-                            },
-                            style: { cursor: 'pointer' }
-                          })}
-                        />
-                      );
+                        return (
+                          <Table
+                            columns={columns}
+                            dataSource={dataSource}
+                            pagination={false}
+                            size="small"
+                            bordered
+                            scroll={{ x: 'max-content' }}
+                            onRow={(record) => ({
+                              onClick: (event) => {
+                                // 获取点击的列
+                                const target = event.target;
+                                let columnKey = null;
+                                
+                                // 尝试从td元素获取data-key属性
+                                const td = target.closest('td');
+                                if (td) {
+                                  // 获取列索引
+                                  const columnIndex = Array.from(td.parentNode.children).indexOf(td);
+                                  // 只从可见列中获取key，排除以_开头的字段
+                                  const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
+                                  columnKey = visibleKeys[columnIndex];
+                                }
+                                
+                                // 如果没找到，使用第一个可见列作为默认
+                                if (!columnKey) {
+                                  const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
+                                  columnKey = visibleKeys[0];
+                                }
+                                
+                                //console.log('Clicked column:', columnKey, 'Value:', record[columnKey]);
+                                
+                                if (onRowClick) {
+                                  onRowClick(record, columnKey);
+                                }
+                              },
+                              style: { cursor: 'pointer' }
+                            })}
+                          />
+                        );
+                      }
+                    } catch (e) {
+                      // 如果不是 JSON 或不是表格格式，就显示原始文本
                     }
-                  } catch (e) {
-                    // 如果不是 JSON 或不是表格格式，就显示原始文本
-                  }
-                  
-                  // 默认显示文本
-                  return <Text code style={{ whiteSpace: 'pre-wrap' }}>{operator.output}</Text>;
-                })()}
-              </Panel>
-            </Collapse>
+                    
+                    // 默认显示文本
+                    return <Text code style={{ whiteSpace: 'pre-wrap' }}>{operator.output}</Text>;
+                  })()}
+                </Panel>
+              </Collapse>
+            </div>
           )}
-        </Space>
+        </div>
       </div>
     </Card>
   );
@@ -646,7 +666,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       status: 'pending',
       output: null,
       collapsed: false,
-      parameters: {}
+      parameters: { mode: 'basic' } // 默认设置为basic模式
     };
     setOperators([...operators, newOperator]);
   };
@@ -657,7 +677,11 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         const updatedOp = { ...op, [field]: value };
         // 如果改变的是算子类型，重置参数
         if (field === 'type') {
-          updatedOp.parameters = {};
+          if (value === 'Extract') {
+            updatedOp.parameters = { mode: 'basic' }; // Extract算子默认为basic模式
+          } else {
+            updatedOp.parameters = {};
+          }
         }
         return updatedOp;
       }
@@ -723,8 +747,10 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
           processedParameters.columns_prompt = columnDescriptions;
         }
         
-        // 移除原始的columns数组，避免发送给后端
-        delete processedParameters.columns;
+        // 对于Extract算子，保留原始的columns参数，让后端接收所有三个参数
+        if (operator.type !== 'Extract') {
+          delete processedParameters.columns;
+        }
       }
 
       // 获取选中索引的名称列表
@@ -743,7 +769,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
             type: operator.type,
             prompt: operator.prompt,
             model: operator.model,
-            parameters: processedParameters,
+            parameters: processedParameters, // 包含所有三个参数：tablename, columns, prompt
             function_name: projectInfo?.new_function_name || null,
             selected_indexes: selectedIndexNames || [] // 使用索引名称列表
           })

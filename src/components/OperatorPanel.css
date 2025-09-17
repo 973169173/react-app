@@ -1,0 +1,355 @@
+/* 算子卡片美化样式 */
+.operator-card {
+  border: 1px solid #e8f4f8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.3s ease !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  overflow: hidden !important;
+  margin-bottom: 16px !important;
+}
+
+.operator-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  border-color: #40a9ff !important;
+  transform: translateY(-2px) !important;
+}
+
+/* 卡片头部样式 */
+.operator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 12px 20px;
+  background: linear-gradient(90deg, #f8fbff 0%, #f0f9ff 100%);
+  border-bottom: 1px solid #e6f7ff;
+  margin: -12px -16px 16px -16px;
+}
+
+.operator-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.operator-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 拖拽手柄样式 */
+.drag-handle {
+  color: #bfbfbf;
+  cursor: grab;
+  font-size: 14px;
+  margin-right: 8px;
+  transition: color 0.2s ease;
+}
+
+.drag-handle:hover {
+  color: #40a9ff;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* 卡片内容区域 */
+.operator-content {
+  padding: 4px 0;
+}
+
+.operator-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.operator-field {
+  display: flex;
+  flex-direction: column;
+  background: #fafbfc;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 14px;
+  transition: all 0.2s ease;
+}
+
+.operator-field:hover {
+  background: #f6f9fc;
+  border-color: #e6f7ff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+/* 参数容器样式 */
+.parameters-container {
+  margin-top: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fbff 0%, #f0f9ff 100%);
+  border: 1px solid #e6f7ff;
+  border-radius: 8px;
+}
+
+.parameter-item {
+  background: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.parameter-item:last-child {
+  margin-bottom: 0;
+}
+
+.parameter-item:hover {
+  border-color: #d9d9d9;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.parameter-label {
+  color: #262626 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+  display: block !important;
+}
+
+/* 参数输入区域美化 */
+.operator-content .ant-space-vertical {
+  width: 100%;
+}
+
+.operator-content .ant-space-item {
+  width: 100%;
+}
+
+/* 参数标签样式 */
+.operator-content .ant-typography {
+  color: #262626 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+}
+
+/* 输入框和选择器美化 */
+.operator-content .ant-select,
+.operator-content .ant-input,
+.operator-content .ant-input-number {
+  border-radius: 6px !important;
+  border: 1px solid #e1e8ed !important;
+  transition: all 0.2s ease !important;
+}
+
+.operator-content .ant-select:hover,
+.operator-content .ant-input:hover,
+.operator-content .ant-input-number:hover {
+  border-color: #40a9ff !important;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.1) !important;
+}
+
+.operator-content .ant-select-focused,
+.operator-content .ant-input:focus,
+.operator-content .ant-input-number:focus {
+  border-color: #40a9ff !important;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.15) !important;
+}
+
+/* 参数容器美化 */
+.operator-content > .ant-space > .ant-space-item > div {
+  background: #fafbfc;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.operator-content > .ant-space > .ant-space-item > div:hover {
+  background: #f6f9fc;
+  border-color: #e6f7ff;
+}
+
+/* 参数区域特殊样式 */
+.operator-content div[style*="backgroundColor: '#f8f9fa'"] {
+  background: linear-gradient(135deg, #f8fbff 0%, #f0f9ff 100%) !important;
+  border: 1px solid #e6f7ff !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  margin-top: 8px !important;
+}
+
+/* 参数内部项目样式 */
+.operator-content div[style*="marginBottom: 8"] {
+  background: white !important;
+  border: 1px solid #f0f0f0 !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.operator-content div[style*="marginBottom: 8"]:hover {
+  border-color: #d9d9d9 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* 按钮美化 */
+.operator-header .ant-btn {
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.operator-header .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.2) !important;
+}
+
+.operator-header .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%) !important;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 状态徽章美化 */
+.operator-info .ant-badge {
+  font-weight: 500;
+}
+
+.operator-info .ant-badge-status-text {
+  color: #262626;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 折叠面板美化 */
+.operator-content .ant-collapse {
+  border: 1px solid #e6f7ff !important;
+  border-radius: 8px !important;
+  background: #fafbfc !important;
+}
+
+.operator-content .ant-collapse-header {
+  background: #f0f9ff !important;
+  border-radius: 8px 8px 0 0 !important;
+  font-weight: 600 !important;
+  color: #1890ff !important;
+}
+
+.operator-content .ant-collapse-content {
+  border-top: 1px solid #e6f7ff !important;
+  background: white !important;
+}
+
+/* 表格美化 */
+.operator-content .ant-table-small {
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+.operator-content .ant-table-thead > tr > th {
+  background: #fafafa !important;
+  color: #262626 !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid #f0f0f0 !important;
+}
+
+.operator-content .ant-table-tbody > tr:hover > td {
+  background: #e6f7ff !important;
+}
+
+/* 列输入组件美化 */
+.operator-content div[style*="marginTop: 4"] {
+  margin-top: 8px !important;
+}
+
+.operator-content div[style*="display: flex"] {
+  background: white !important;
+  border: 1px solid #f0f0f0 !important;
+  border-radius: 6px !important;
+  padding: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.operator-content div[style*="display: flex"]:hover {
+  border-color: #d9d9d9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 添加列按钮美化 */
+.operator-content .ant-btn-dashed {
+  border: 2px dashed #d9d9d9 !important;
+  border-radius: 6px !important;
+  color: #8c8c8c !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.operator-content .ant-btn-dashed:hover {
+  border-color: #40a9ff !important;
+  color: #40a9ff !important;
+  background: #f0f9ff !important;
+}
+
+/* 运行状态指示 */
+.operator-card[data-status="running"] {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+.operator-card[data-status="enabled"] {
+  border-color: #52c41a !important;
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.1) !important;
+}
+
+.operator-card[data-status="error"] {
+  border-color: #ff4d4f !important;
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1) !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .operator-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .operator-actions {
+    justify-content: center;
+  }
+}
+
+/* 动画效果 */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.operator-card {
+  animation: slideInUp 0.3s ease-out;
+}
+
+/* 文本样式优化 */
+.operator-content .ant-typography-caption {
+  color: #8c8c8c !important;
+  font-size: 12px !important;
+}
+
+/* 间距优化 */
+.operators-list {
+  padding: 0 4px;
+}
+
+.operators-list .operator-card:last-child {
+  margin-bottom: 0 !important;
+}

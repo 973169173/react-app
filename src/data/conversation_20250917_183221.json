@@ -1,0 +1,25 @@
+{
+  "conversations": [
+    {
+      "id": 1,
+      "type": "user",
+      "content": "I want to know some information about NBA players",
+      "timestamp": "18:32:04"
+    },
+    {
+      "id": 2,
+      "type": "assistant",
+      "content": "I found that your document contains information about several NBA players.",
+      "output": "{\"columns\":[\"document_name\",\"player_type\",\"status\",\"_source_document_name\"],\"data\":[[\"Aaron_Williams.txt\",\"NBA Player\",\"Active\"],[\"Andre_Drummond.txt\",\"NBA Player\",\"Active\"],[\"Angelo_Russell.txt\",\"NBA Player\",\"Active\"]],\"index\":[0,1,2]}",
+      "timestamp": "18:32:04",
+      "relatedDocs": [
+        "Aaron_Williams.txt",
+        "Andre_Drummond.txt",
+        "Angelo_Russell.txt"
+      ]
+    }
+  ],
+  "model": "gpt-4o",
+  "selectedIndexes": [],
+  "timestamp": "2025-09-17T18:32:20"
+}

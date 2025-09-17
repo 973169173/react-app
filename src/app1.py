@@ -39,10 +39,13 @@ fun = OperationImplementation()
 def extract_data():
     #time.sleep(10)
     print(request.json)
-    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
-    tablename,columnname=parameters.get('tablename',''),parameters.get('column_name','')
+    type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
+    prompt,mode,tablename,columnname=parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('mode',''),parameters.get('prompt','')
     print(type,prompt,model,parameters)
-    fo_name=fun.extract_text(foname,tablename,columnname)
+    if(mode == 'basic'):
+        fo_name=fun.extract_text(foname,tablename,columnname,prompt)
+    elif(mode == 'semantic'):
+        fo_name=fun.extract_text_semantic(foname,tablename,prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
