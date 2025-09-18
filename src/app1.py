@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/yuxinjiang/quest')
+sys.path.append('/home/lijianhui/workspace/quest')
 
 
 from flask import Flask, jsonify, request, send_file
@@ -12,8 +12,11 @@ from werkzeug.utils import secure_filename
 import pandas as pd
 import time
 import uuid
+import logging
 
 app = Flask(__name__)
+app.debug = True
+app.logger.setLevel(logging.DEBUG)
 CORS(app)
 
 # 配置上传文件夹、数据文件夹和项目文件夹
@@ -40,8 +43,9 @@ def extract_data():
     #time.sleep(10)
     print(request.json)
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
-    prompt,mode,tablename,columnname=parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('mode',''),parameters.get('prompt','')
+    prompt,mode,tablename,columnname=parameters.get('prompt',''),parameters.get('mode',''),parameters.get('tablename',''),parameters.get('column_name','')
     print(type,prompt,model,parameters)
+    fo_name = str(foname)
     if(mode == 'basic'):
         fo_name=fun.extract_text(foname,tablename,columnname,prompt)
     elif(mode == 'semantic'):
@@ -55,9 +59,9 @@ def extract_data():
 @app.route('/api/filter', methods=['POST'])
 def filter():
     type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
-    tablename,condition,columnname=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name','')
+    tablename,condition,columnname,columns_prompt=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
     print(type,prompt,model,parameters)
-    fo_name=fun.filter_text(foname,tablename,columnname,condition)
+    fo_name=fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
