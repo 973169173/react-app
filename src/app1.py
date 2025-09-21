@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/lijianhui/workspace/quest')
+sys.path.append('/home/yuxinjiang')  # 添加 quest 的父目录到 sys.path
 
 
 from flask import Flask, jsonify, request, send_file
@@ -33,7 +33,7 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-from quest.backend.interface.operation import OperationImplementation
+from quest.quest.backend.interface.operation import OperationImplementation
 
 fun = OperationImplementation()
 
@@ -43,13 +43,13 @@ def extract_data():
     #time.sleep(10)
     print(request.json)
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
-    prompt,mode,tablename,columnname=parameters.get('prompt',''),parameters.get('mode',''),parameters.get('tablename',''),parameters.get('column_name','')
+    prompt,mode,tablename,columnname,columns_prompt=parameters.get('prompt',''),parameters.get('mode',''),parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
     print(type,prompt,model,parameters)
-    fo_name = str(foname)
+    fo_name = ""
     if(mode == 'basic'):
-        fo_name=fun.extract_text(foname,tablename,columnname,prompt)
+        fo_name=fun.extract_text(foname,tablename,columnname,columns_prompt)
     elif(mode == 'semantic'):
-        fo_name=fun.extract_text_semantic(foname,tablename,prompt)
+        fo_name=fun.extract_text_semantic(foname,tablename,columns_prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
@@ -58,10 +58,13 @@ def extract_data():
 
 @app.route('/api/filter', methods=['POST'])
 def filter():
-    type,prompt,model,parameters,foname=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
-    tablename,condition,columnname,columns_prompt=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
+    type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
+    tablename,condition,columnname,columns_prompt,mode,prompt=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name',''),parameters.get('columns_prompt',''),parameters.get('mode',''),parameters.get('prompt','')
     print(type,prompt,model,parameters)
-    fo_name=fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
+    if(mode == 'basic'):
+        fo_name=fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
+    elif(mode == 'semantic'):
+        fo_name=fun.filter_text_semantic(foname,tablename,prompt)
     df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
         'function_name':fo_name,
@@ -120,10 +123,11 @@ def build_index():
         foldername=request_data.get('folderName', "")
         document_names = request_data.get('documents', "")
         tabel_name = request_data.get('indexName',"")
-        base_path = "/home/lijianhui/workspace/react-app/src/files/"+foldername[0] # Modify
+        
+        base_path = '/home/yuxinjiang/react-app/src/files/'+foldername[0] # Modify
         print("now build from:", document_names, " ", tabel_name, " ", base_path)
         full_paths = [os.path.join(base_path, name) for name in document_names]
-        fun.build_indexer([base_path], [tabel_name], ['TextDoc'])
+        fun.build_indexer_with_name_set(base_path, tabel_name,'TextDoc',set(document_names))
 
         
         # 返回成功结果

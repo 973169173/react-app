@@ -46,6 +46,9 @@ def extract_data():
 
 @app.route('/api/filter', methods=['POST'])
 def filter():
+    print(request.json)
+    type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
+    print(type,prompt,model,parameters);
     data={
         'doc':['Aaron_Williams.txt','1111111','222222222'],
         'age':['30','12','212'],
@@ -341,107 +344,107 @@ def get_project_data(function_name):
     try:
         # 写死的测试数据，您可以根据function_name返回不同的数据
         project_data = {
-            'operators': [
-                {
-                    'id': 1,
-                    'name': 'test_retrieve',
-                    'type': 'Retrieve',
-                    'model': 'gpt-4o',
-                    'status': 'enabled',
-                    'output': None,
-                    'collapsed': False,
-                    'parameters': {
-                        'tablename': 'documents',
-                        'columns': [
-                            {'columnname': 'name', 'description': 'name'},
-                            {'columnname': 'content', 'description': 'document content'}
-                        ]
-                    }
-                },
-                {
-                    'id': 2,
-                    'name': 'test_extract',
-                    'type': 'Extract',
-                    'model': 'gpt-4o',
-                    'status': 'enabled',
-                    'output': None,
-                    'collapsed': False,
-                    'parameters': {
-                        'tablename': 'results',
-                        'columns': [
-                            {'columnname': 'age', 'description': 'age'},
-                            {'columnname': 'occupation', 'description': 'job or occupation'}
-                        ]
-                    }
-                },
-                {
-                    'id': 3,
-                    'name': 'test_filter',
-                    'type': 'Filter',
-                    'model': 'gpt-4o',
-                    'status': 'enabled',
-                    'output': None,
-                    'collapsed': False,
-                    'parameters': {
-                        'tablename': 'filtered_results',
-                        'columns': [
-                            {'columnname': 'result', 'description': 'filtered result'}
-                        ],
-                        'condition': 'age > 18'
-                    }
-                }
-            ],
-            'nodes': [
-                {
-                    'id': 1,
-                    'type': 'Retrieve',
-                    "executionTime": 2313,
-                    "tokenUsage": 23123,
-                    'parameters': {
-                        'tablename': 'documents',
-                        'columns': [
-                            {'columnname': 'name', 'description': 'name'},
-                            {'columnname': 'content', 'description': 'document content'}
-                        ]
-                    }
-                },
-                {
-                    'id': 2,
-                    'type': 'Extract',
-                    "executionTime": 2313,
-                    "tokenUsage": 623280,
-                    'parameters': {
-                        'tablename': 'results',
-                        'columns': [
-                            {'columnname': 'age', 'description': 'age'},
-                            {'columnname': 'occupation', 'description': 'job or occupation'}
-                        ]
-                    }
-                },
-                {
-                    'id': 3,
-                    'type': 'filter',
-                    "executionTime": 4334432,
-                    "tokenUsage": 432424,
-                    'parameters': {
-                        'tablename': 'filtered_results',
-                        'columns': [
-                            {'columnname': 'result', 'description': 'filtered result'}
-                        ],
-                        'condition': 'age > 18'
-                    }
-                }
-            ],
-            'edges': {
-                1: [2],
-                2: [3],
-                3: []
-            },
-            'indeg': {
-                1: 0,
-                2: 1,
-                3: 1
-            }
+            # 'operators': [
+            #     {
+            #         'id': 1,
+            #         'name': 'test_retrieve',
+            #         'type': 'Retrieve',
+            #         'model': 'gpt-4o',
+            #         'status': 'enabled',
+            #         'output': None,
+            #         'collapsed': False,
+            #         'parameters': {
+            #             'tablename': 'documents',
+            #             'columns': [
+            #                 {'columnname': 'name', 'description': 'name'},
+            #                 {'columnname': 'content', 'description': 'document content'}
+            #             ]
+            #         }
+            #     },
+            #     {
+            #         'id': 2,
+            #         'name': 'test_extract',
+            #         'type': 'Extract',
+            #         'model': 'gpt-4o',
+            #         'status': 'enabled',
+            #         'output': None,
+            #         'collapsed': False,
+            #         'parameters': {
+            #             'tablename': 'results',
+            #             'columns': [
+            #                 {'columnname': 'age', 'description': 'age'},
+            #                 {'columnname': 'occupation', 'description': 'job or occupation'}
+            #             ]
+            #         }
+            #     },
+            #     {
+            #         'id': 3,
+            #         'name': 'test_filter',
+            #         'type': 'Filter',
+            #         'model': 'gpt-4o',
+            #         'status': 'enabled',
+            #         'output': None,
+            #         'collapsed': False,
+            #         'parameters': {
+            #             'tablename': 'filtered_results',
+            #             'columns': [
+            #                 {'columnname': 'result', 'description': 'filtered result'}
+            #             ],
+            #             'condition': 'age > 18'
+            #         }
+            #     }
+            # ],
+            # 'nodes': [
+            #     {
+            #         'id': 1,
+            #         'type': 'Retrieve',
+            #         "executionTime": 2313,
+            #         "tokenUsage": 23123,
+            #         'parameters': {
+            #             'tablename': 'documents',
+            #             'columns': [
+            #                 {'columnname': 'name', 'description': 'name'},
+            #                 {'columnname': 'content', 'description': 'document content'}
+            #             ]
+            #         }
+            #     },
+            #     {
+            #         'id': 2,
+            #         'type': 'Extract',
+            #         "executionTime": 2313,
+            #         "tokenUsage": 623280,
+            #         'parameters': {
+            #             'tablename': 'results',
+            #             'columns': [
+            #                 {'columnname': 'age', 'description': 'age'},
+            #                 {'columnname': 'occupation', 'description': 'job or occupation'}
+            #             ]
+            #         }
+            #     },
+            #     {
+            #         'id': 3,
+            #         'type': 'filter',
+            #         "executionTime": 4334432,
+            #         "tokenUsage": 432424,
+            #         'parameters': {
+            #             'tablename': 'filtered_results',
+            #             'columns': [
+            #                 {'columnname': 'result', 'description': 'filtered result'}
+            #             ],
+            #             'condition': 'age > 18'
+            #         }
+            #     }
+            # ],
+            # 'edges': {
+            #     1: [2],
+            #     2: [3],
+            #     3: []
+            # },
+            # 'indeg': {
+            #     1: 0,
+            #     2: 1,
+            #     3: 1
+            # }
         }
         
         return jsonify(project_data)

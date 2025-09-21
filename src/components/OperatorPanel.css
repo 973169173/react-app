@@ -1,18 +1,22 @@
 /* 算子卡片美化样式 */
 .operator-card {
-  border: 1px solid #e8f4f8 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(99, 179, 237, 0.15) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 2px 12px rgba(99, 179, 237, 0.08) !important;
   transition: all 0.3s ease !important;
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%) !important;
   overflow: hidden !important;
   margin-bottom: 16px !important;
+  /* 避免拖拽时的闪烁 */
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 
-.operator-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
-  border-color: #40a9ff !important;
-  transform: translateY(-2px) !important;
+/* 悬浮时的样式，但拖拽时不应用 */
+.operator-card:hover:not([style*="transform"]) {
+  box-shadow: 0 4px 20px rgba(99, 179, 237, 0.15) !important;
+  border-color: rgba(64, 169, 255, 0.4) !important;
+  /* transform: translateY(0px) !important; */
 }
 
 /* 卡片头部样式 */
@@ -21,8 +25,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px 12px 20px;
-  background: linear-gradient(90deg, #f8fbff 0%, #f0f9ff 100%);
-  border-bottom: 1px solid #e6f7ff;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f6ff 100%);
+  border-bottom: 1px solid rgba(99, 179, 237, 0.12);
   margin: -12px -16px 16px -16px;
 }
 
@@ -55,162 +59,406 @@
   cursor: grabbing;
 }
 
-/* 卡片内容区域 */
-.operator-content {
+/* 网格布局容器 */
+.operator-grid {
   padding: 4px 0;
 }
 
-.operator-fields {
-  display: flex;
-  flex-direction: column;
+/* 网格行样式 */
+.grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
+  margin-bottom: 16px;
 }
 
-.operator-field {
-  display: flex;
-  flex-direction: column;
-  background: #fafbfc;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 14px;
-  transition: all 0.2s ease;
+.grid-row.full-width {
+  grid-template-columns: 1fr;
 }
 
-.operator-field:hover {
-  background: #f6f9fc;
-  border-color: #e6f7ff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+/* 网格项样式 */
+.grid-item {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fbff 100%);
+  border: 1px solid rgba(99, 179, 237, 0.12);
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-/* 参数容器样式 */
-.parameters-container {
-  margin-top: 12px;
-  padding: 16px;
-  background: linear-gradient(135deg, #f8fbff 0%, #f0f9ff 100%);
-  border: 1px solid #e6f7ff;
-  border-radius: 8px;
+.grid-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #40a9ff 0%, #69c0ff 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
-.parameter-item {
-  background: white;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 12px;
-  transition: all 0.2s ease;
+.grid-item:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f6ff 100%);
+  border-color: rgba(64, 169, 255, 0.3);
+  box-shadow: 0 2px 12px rgba(64, 169, 255, 0.08);
+  transform: translateY(-1px);
 }
 
-.parameter-item:last-child {
-  margin-bottom: 0;
+.grid-item:hover::before {
+  opacity: 1;
 }
 
-.parameter-item:hover {
-  border-color: #d9d9d9;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.parameter-label {
-  color: #262626 !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  margin-bottom: 6px !important;
+/* 字段标签样式 */
+.field-label {
   display: block !important;
-}
-
-/* 参数输入区域美化 */
-.operator-content .ant-space-vertical {
-  width: 100%;
-}
-
-.operator-content .ant-space-item {
-  width: 100%;
-}
-
-/* 参数标签样式 */
-.operator-content .ant-typography {
-  color: #262626 !important;
+  color: #1a1a1a !important;
   font-weight: 600 !important;
-  font-size: 13px !important;
-  margin-bottom: 6px !important;
+  font-size: 14px !important;
+  margin-bottom: 8px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  opacity: 0.8;
 }
 
 /* 输入框和选择器美化 */
-.operator-content .ant-select,
-.operator-content .ant-input,
-.operator-content .ant-input-number {
-  border-radius: 6px !important;
-  border: 1px solid #e1e8ed !important;
+.grid-item .ant-select,
+.grid-item .ant-input,
+.grid-item .ant-input-number {
+  border-radius: 12px !important;
+  border: 2px solid #f0f4f8 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  height: 44px !important;
+  padding: 12px 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* 重置选择器的所有状态边框 */
+.grid-item .ant-select.ant-select-single:not(.ant-select-customize-input) .ant-select-selector,
+.grid-item .ant-select.ant-select-focused .ant-select-selector,
+.grid-item .ant-select.ant-select-open .ant-select-selector,
+.grid-item .ant-select:hover .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+.grid-item .ant-select:hover,
+.grid-item .ant-input:hover,
+.grid-item .ant-input-number:hover {
+  border-color: #40a9ff !important;
+  box-shadow: 0 4px 20px rgba(64, 169, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%) !important;
+}
+
+.grid-item .ant-select-focused,
+.grid-item .ant-select.ant-select-focused,
+.grid-item .ant-input:focus,
+.grid-item .ant-input-number:focus {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.12), 0 4px 20px rgba(64, 169, 255, 0.25) !important;
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f8ff 100%) !important;
+}
+
+/* 现代化输入框样式增强 */
+.grid-item .ant-input::placeholder,
+.grid-item .ant-select-selection-placeholder {
+  color: #9ca3af !important;
+  font-weight: 400 !important;
+  opacity: 0.8 !important;
+  font-style: italic !important;
+}
+
+/* 数字输入框特殊样式 */
+.grid-item .ant-input-number-input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  height: 100% !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.grid-item .ant-input-number-handler-wrap {
+  background: rgba(64, 169, 255, 0.1) !important;
+  border-radius: 0 12px 12px 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.grid-item .ant-input-number:hover .ant-input-number-handler-wrap {
+  opacity: 1 !important;
+}
+
+.grid-item .ant-input-number-handler {
+  border: none !important;
+  color: #40a9ff !important;
+  font-weight: 600 !important;
+}
+
+.grid-item .ant-input-number-handler:hover {
+  background: rgba(24, 144, 255, 0.1) !important;
+  color: #1890ff !important;
+}
+
+/* 下拉框选项美化 */
+.ant-select-dropdown {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid #e6f7ff !important;
+  overflow: hidden !important;
+}
+
+.ant-select-item {
+  border-radius: 8px !important;
+  margin: 4px 8px !important;
+  padding: 12px 16px !important;
+  font-weight: 500 !important;
   transition: all 0.2s ease !important;
 }
 
-.operator-content .ant-select:hover,
-.operator-content .ant-input:hover,
-.operator-content .ant-input-number:hover {
-  border-color: #40a9ff !important;
-  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.1) !important;
+.ant-select-item-option-selected {
+  background: linear-gradient(135deg, #e6f7ff 0%, #d1e7ff 100%) !important;
+  color: #1890ff !important;
+  font-weight: 600 !important;
 }
 
-.operator-content .ant-select-focused,
-.operator-content .ant-input:focus,
-.operator-content .ant-input-number:focus {
+.ant-select-item-option-active {
+  background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%) !important;
+  color: #1890ff !important;
+}
+
+/* 输入框内部图标美化 */
+.grid-item .ant-input-prefix,
+.grid-item .ant-input-suffix {
+  color: #6b7280 !important;
+}
+
+.grid-item .ant-input:hover .ant-input-prefix,
+.grid-item .ant-input:hover .ant-input-suffix {
+  color: #40a9ff !important;
+}
+
+.grid-item .ant-input:focus .ant-input-prefix,
+.grid-item .ant-input:focus .ant-input-suffix {
+  color: #1890ff !important;
+}
+
+/* 下拉框特殊美化 */
+.grid-item .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* 完全重置选择器的内部边框 */
+.grid-item .ant-select-selector::after {
+  content: none !important;
+}
+
+.grid-item .ant-select-selector::before {
+  content: none !important;
+}
+
+/* 重置所有内部边框 */
+.grid-item .ant-select .ant-select-selector,
+.grid-item .ant-select.ant-select-focused .ant-select-selector,
+.grid-item .ant-select.ant-select-open .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.grid-item .ant-select-selection-item {
+  color: #1a1a1a !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.grid-item .ant-select-selection-placeholder {
+  color: #8b949e !important;
+  font-weight: 400 !important;
+  opacity: 0.7 !important;
+}
+
+.grid-item .ant-select-arrow {
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  margin-right: 4px !important;
+  transition: all 0.2s ease !important;
+}
+
+.grid-item .ant-select:hover .ant-select-arrow {
+  color: #1890ff !important;
+}
+
+.grid-item .ant-select-open .ant-select-arrow {
+  transform: rotate(180deg) !important;
+  color: #1890ff !important;
+}
+
+/* 强制重置所有选择器的边框和伪元素 */
+.grid-item .ant-select *,
+.grid-item .ant-select *::before,
+.grid-item .ant-select *::after {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 特别针对选择器容器的重置 */
+.grid-item .ant-select-selector,
+.grid-item .ant-select-selection-search,
+.grid-item .ant-select-selection-item,
+.grid-item .ant-select-selection-placeholder {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* 确保下拉状态时没有额外边框 */
+.grid-item .ant-select-open,
+.grid-item .ant-select-focused,
+.grid-item .ant-select-open .ant-select-selector,
+.grid-item .ant-select-focused .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 文本域特殊样式 */
+.grid-item .ant-input[type="textarea"] {
+  min-height: 100px !important;
+  resize: vertical !important;
+  font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  line-height: 1.6 !important;
+  padding: 16px !important;
+  border-radius: 12px !important;
+  border: 2px solid #f0f4f8 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+.grid-item .ant-input[type="textarea"]:hover {
+  border-color: #40a9ff !important;
+  box-shadow: 0 4px 20px rgba(64, 169, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%) !important;
+}
+
+.grid-item .ant-input[type="textarea"]:focus {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.12), 0 4px 20px rgba(64, 169, 255, 0.25) !important;
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f8ff 100%) !important;
+}
+
+/* 参数网格区域 */
+.parameters-grid {
+  margin-top: 8px;
+}
+
+/* 列输入组件美化 */
+.grid-item div[style*="display: flex"] {
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  border: 2px solid #f0f4f8 !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  margin-bottom: 12px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.grid-item div[style*="display: flex"]:hover {
+  border-color: #40a9ff !important;
+  box-shadow: 0 4px 20px rgba(64, 169, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%) !important;
+}
+
+/* 列输入框内部的输入框特殊样式 */
+.grid-item div[style*="display: flex"] .ant-input {
+  border: 1px solid #e8e8ea !important;
+  border-radius: 8px !important;
+  height: 36px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  background: white !important;
+  transition: all 0.2s ease !important;
+}
+
+.grid-item div[style*="display: flex"] .ant-input:hover {
+  border-color: #d1e7ff !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+}
+
+.grid-item div[style*="display: flex"] .ant-input:focus {
   border-color: #40a9ff !important;
   box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.15) !important;
 }
 
-/* 参数容器美化 */
-.operator-content > .ant-space > .ant-space-item > div {
-  background: #fafbfc;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 12px;
-  transition: all 0.2s ease;
+/* 添加列按钮美化 */
+.grid-item .ant-btn-dashed {
+  border: 2px dashed #d1e7ff !important;
+  border-radius: 12px !important;
+  color: #40a9ff !important;
+  font-weight: 600 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  height: 44px !important;
+  background: linear-gradient(135deg, #fafcff 0%, #f0f8ff 100%) !important;
+  font-size: 14px !important;
+  letter-spacing: 0.5px !important;
 }
 
-.operator-content > .ant-space > .ant-space-item > div:hover {
-  background: #f6f9fc;
-  border-color: #e6f7ff;
+.grid-item .ant-btn-dashed:hover {
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+  background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 25px rgba(24, 144, 255, 0.25) !important;
 }
 
-/* 参数区域特殊样式 */
-.operator-content div[style*="backgroundColor: '#f8f9fa'"] {
-  background: linear-gradient(135deg, #f8fbff 0%, #f0f9ff 100%) !important;
-  border: 1px solid #e6f7ff !important;
-  border-radius: 8px !important;
-  padding: 16px !important;
-  margin-top: 8px !important;
-}
-
-/* 参数内部项目样式 */
-.operator-content div[style*="marginBottom: 8"] {
-  background: white !important;
-  border: 1px solid #f0f0f0 !important;
-  border-radius: 6px !important;
-  padding: 12px !important;
-  margin-bottom: 12px !important;
-  transition: all 0.2s ease !important;
-}
-
-.operator-content div[style*="marginBottom: 8"]:hover {
-  border-color: #d9d9d9 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+.grid-item .ant-btn-dashed:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 10px rgba(24, 144, 255, 0.2) !important;
 }
 
 /* 按钮美化 */
 .operator-header .ant-btn {
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   font-weight: 500 !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.3s ease !important;
+  height: 32px !important;
 }
 
 .operator-header .ant-btn-primary {
   background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
   border: none !important;
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.2) !important;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.25) !important;
 }
 
 .operator-header .ant-btn-primary:hover {
   background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%) !important;
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.35) !important;
   transform: translateY(-1px) !important;
 }
 
@@ -225,93 +473,89 @@
   font-size: 14px;
 }
 
-/* 折叠面板美化 */
-.operator-content .ant-collapse {
-  border: 1px solid #e6f7ff !important;
-  border-radius: 8px !important;
-  background: #fafbfc !important;
+/* 输出区域样式 */
+.output-section {
+  margin-top: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(99, 179, 237, 0.12);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fbff 100%);
 }
 
-.operator-content .ant-collapse-header {
-  background: #f0f9ff !important;
-  border-radius: 8px 8px 0 0 !important;
+.output-section .ant-collapse {
+  border: none !important;
+  background: transparent !important;
+}
+
+.output-section .ant-collapse-header {
+  background: linear-gradient(135deg, #f8faff 0%, #f0f6ff 100%) !important;
+  border-radius: 0 !important;
   font-weight: 600 !important;
   color: #1890ff !important;
+  padding: 12px 16px !important;
 }
 
-.operator-content .ant-collapse-content {
-  border-top: 1px solid #e6f7ff !important;
-  background: white !important;
+.output-section .ant-collapse-content {
+  border-top: 1px solid rgba(99, 179, 237, 0.12) !important;
+  background: #ffffff !important;
+}
+
+.output-section .ant-collapse-content-box {
+  padding: 16px !important;
 }
 
 /* 表格美化 */
-.operator-content .ant-table-small {
+.output-section .ant-table-small {
   border-radius: 6px !important;
   overflow: hidden !important;
 }
 
-.operator-content .ant-table-thead > tr > th {
+.output-section .ant-table-thead > tr > th {
   background: #fafafa !important;
   color: #262626 !important;
   font-weight: 600 !important;
   border-bottom: 2px solid #f0f0f0 !important;
 }
 
-.operator-content .ant-table-tbody > tr:hover > td {
+.output-section .ant-table-tbody > tr:hover > td {
   background: #e6f7ff !important;
-}
-
-/* 列输入组件美化 */
-.operator-content div[style*="marginTop: 4"] {
-  margin-top: 8px !important;
-}
-
-.operator-content div[style*="display: flex"] {
-  background: white !important;
-  border: 1px solid #f0f0f0 !important;
-  border-radius: 6px !important;
-  padding: 8px !important;
-  margin-bottom: 8px !important;
-}
-
-.operator-content div[style*="display: flex"]:hover {
-  border-color: #d9d9d9 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* 添加列按钮美化 */
-.operator-content .ant-btn-dashed {
-  border: 2px dashed #d9d9d9 !important;
-  border-radius: 6px !important;
-  color: #8c8c8c !important;
-  font-weight: 500 !important;
-  transition: all 0.2s ease !important;
-}
-
-.operator-content .ant-btn-dashed:hover {
-  border-color: #40a9ff !important;
-  color: #40a9ff !important;
-  background: #f0f9ff !important;
 }
 
 /* 运行状态指示 */
 .operator-card[data-status="running"] {
-  border-color: #1890ff !important;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+  border-color: rgba(24, 144, 255, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.08) !important;
+}
+
+.operator-card[data-status="running"] .operator-header {
+  background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
 }
 
 .operator-card[data-status="enabled"] {
-  border-color: #52c41a !important;
-  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.1) !important;
+  border-color: rgba(82, 196, 26, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.08) !important;
+}
+
+.operator-card[data-status="enabled"] .operator-header {
+  background: linear-gradient(135deg, #f6ffed 0%, #f0fff0 100%);
 }
 
 .operator-card[data-status="error"] {
-  border-color: #ff4d4f !important;
-  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1) !important;
+  border-color: rgba(255, 77, 79, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.08) !important;
+}
+
+.operator-card[data-status="error"] .operator-header {
+  background: linear-gradient(135deg, #fff2f0 0%, #ffebe8 100%);
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .grid-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+  
   .operator-header {
     flex-direction: column;
     gap: 12px;
@@ -320,6 +564,10 @@
   
   .operator-actions {
     justify-content: center;
+  }
+  
+  .grid-item {
+    padding: 10px 12px;
   }
 }
 
@@ -339,12 +587,6 @@
   animation: slideInUp 0.3s ease-out;
 }
 
-/* 文本样式优化 */
-.operator-content .ant-typography-caption {
-  color: #8c8c8c !important;
-  font-size: 12px !important;
-}
-
 /* 间距优化 */
 .operators-list {
   padding: 0 4px;
@@ -352,4 +594,266 @@
 
 .operators-list .operator-card:last-child {
   margin-bottom: 0 !important;
+}
+
+/* 清理旧样式 */
+.operator-fields,
+.operator-field,
+.parameters-container,
+.parameter-item,
+.parameter-label {
+  display: none !important;
+}
+
+/* 折叠功能样式 */
+.operator-content {
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.operator-grid.collapsed {
+  padding: 8px 0 4px 0;
+}
+
+.operator-grid.collapsed .grid-item {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(99, 179, 237, 0.1);
+  padding: 8px 12px;
+}
+
+.operator-grid.collapsed .field-label {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-bottom: 2px;
+}
+
+.operator-grid.collapsed .ant-typography {
+  font-size: 12px;
+  color: #595959;
+}
+
+/* 折叠按钮样式 */
+.operator-actions .ant-btn[title="展开"],
+.operator-actions .ant-btn[title="折叠"] {
+  color: #8c8c8c;
+  border: none;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.operator-actions .ant-btn[title="展开"]:hover,
+.operator-actions .ant-btn[title="折叠"]:hover {
+  color: #40a9ff;
+  background: rgba(64, 169, 255, 0.1);
+}
+
+/* 折叠状态下卡片高度优化 */
+.operator-card.collapsed {
+  margin-bottom: 12px !important;
+}
+
+.operator-grid.collapsed .grid-row {
+  margin-bottom: 8px;
+}
+
+.operator-grid.collapsed .grid-row:last-child {
+  margin-bottom: 0;
+}
+
+/* 拖拽优化样式 */
+[data-dnd-context] {
+  will-change: transform;
+}
+
+/* 拖拽中的卡片样式 */
+.operator-card[style*="transform"] {
+  transition: none !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
+  z-index: 1000 !important;
+  border-color: #40a9ff !important;
+  background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%) !important;
+  /* 强制禁用所有过渡动画 */
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -ms-transition: none !important;
+  -o-transition: none !important;
+}
+
+/* 拖拽中禁用卡片内所有元素的过渡动画 */
+.operator-card[style*="transform"] * {
+  transition: none !important;
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -ms-transition: none !important;
+  -o-transition: none !important;
+}
+
+/* 拖拽手柄增强 */
+.drag-handle {
+  color: #bfbfbf;
+  cursor: grab;
+  font-size: 14px;
+  margin-right: 8px;
+  transition: color 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.drag-handle:hover {
+  color: #40a9ff;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  color: #1890ff;
+}
+
+/* 拖拽中禁用卡片的过渡动画 */
+.operator-card:has([style*="transform"]) {
+  transition: none !important;
+}
+
+/* 拖拽排序时的占位符样式 */
+.sortable-ghost {
+  opacity: 0.4 !important;
+  background: #f0f0f0 !important;
+  border: 2px dashed #d9d9d9 !important;
+}
+
+/* 拖拽时其他卡片的视觉反馈 */
+.operator-card:not([style*="transform"]) {
+  transition: all 0.2s ease !important;
+}
+
+/* 优化拖拽性能 */
+.operators-list {
+  contain: layout style paint;
+  /* 启用硬件加速 */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* 优化滚动性能 */
+  -webkit-overflow-scrolling: touch;
+}
+
+.operator-card {
+  contain: layout style;
+  /* 启用硬件加速 */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* 优化重绘性能 */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* 强制使用GPU渲染 */
+  will-change: transform, opacity;
+}
+
+/* From Uiverse.io by cbolson - Custom Switch Component */ 
+.switch {
+  --_switch-bg-clr: #70a9c5;
+  --_switch-padding: 3px; /* padding around button*/
+  --_slider-bg-clr: rgba(12, 74, 110, 0.65); /* slider color unchecked */
+  --_slider-bg-clr-on: rgba(12, 74, 110, 1); /* slider color checked */
+  --_slider-txt-clr: #ffffff;
+  --_label-padding: 0.5rem 1rem; /* reduced padding for smaller size */
+  --_switch-easing: cubic-bezier(
+    0.47,
+    1.64,
+    0.41,
+    0.8
+  ); /* easing on toggle switch */
+  color: white;
+  width: fit-content;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: relative;
+  isolation: isolate;
+  margin-top: 4px;
+  font-size: 12px; /* smaller font size */
+  font-weight: 500;
+}
+
+.switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.switch > span {
+  display: grid;
+  place-content: center;
+  transition: opacity 300ms ease-in-out 150ms;
+  padding: var(--_label-padding);
+  font-size: inherit;
+  font-weight: inherit;
+}
+.switch::before,
+.switch::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+  transition: inset 150ms ease-in-out;
+}
+/* switch slider */
+.switch::before {
+  background-color: var(--_slider-bg-clr);
+  inset: var(--_switch-padding) 50% var(--_switch-padding)
+    var(--_switch-padding);
+  transition:
+    inset 500ms var(--_switch-easing),
+    background-color 500ms ease-in-out;
+  z-index: -1;
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.3),
+    0 1px rgba(255, 255, 255, 0.3);
+}
+/* switch bg color */
+.switch::after {
+  background-color: var(--_switch-bg-clr);
+  inset: 0;
+  z-index: -2;
+}
+/* switch hover & focus */
+.switch:focus-within::after {
+  inset: -0.25rem;
+}
+.switch:has(input:checked):hover > span:first-of-type,
+.switch:has(input:not(:checked)):hover > span:last-of-type {
+  opacity: 1;
+  transition-delay: 0ms;
+  transition-duration: 100ms;
+}
+/* switch hover */
+.switch:has(input:checked):hover::before {
+  inset: var(--_switch-padding) var(--_switch-padding) var(--_switch-padding)
+    45%;
+}
+.switch:has(input:not(:checked)):hover::before {
+  inset: var(--_switch-padding) 45% var(--_switch-padding)
+    var(--_switch-padding);
+}
+/* checked - move slider to right */
+.switch:has(input:checked)::before {
+  background-color: var(--_slider-bg-clr-on);
+  inset: var(--_switch-padding) var(--_switch-padding) var(--_switch-padding)
+    50%;
+}
+/* checked - set opacity */
+.switch > span:last-of-type,
+.switch > input:checked + span:first-of-type {
+  opacity: 0.75;
+}
+.switch > input:checked ~ span:last-of-type {
+  opacity: 1;
 }
