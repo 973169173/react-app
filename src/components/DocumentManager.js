@@ -252,15 +252,16 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt,.zip',
+    accept: '.pdf,.txt',
     customRequest: handleCustomUpload,
     showUploadList: false,
     beforeUpload: (file) => {
-      const lower = file.name.toLowerCase();
-      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
-        file.type.includes('pdf') || file.type.includes('text');
+      const isValidType = file.type.includes('pdf') || 
+                         file.type.includes('text') || 
+                         file.name.toLowerCase().endsWith('.txt') ||
+                         file.name.toLowerCase().endsWith('.pdf');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
         return Upload.LIST_IGNORE;
       }
       
@@ -278,14 +279,15 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadModalProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt,.zip',
+    accept: '.pdf,.txt',
     showUploadList: true,
     beforeUpload: (file) => {
-      const lower = file.name.toLowerCase();
-      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
-        file.type.includes('pdf') || file.type.includes('text');
+      const isValidType = file.type.includes('pdf') || 
+                         file.type.includes('text') || 
+                         file.name.toLowerCase().endsWith('.txt') ||
+                         file.name.toLowerCase().endsWith('.pdf');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
         return false;
       }
       
