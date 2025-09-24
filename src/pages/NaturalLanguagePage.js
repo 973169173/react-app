@@ -156,6 +156,10 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const [savedConversations, setSavedConversations] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
   
+  // SSE 相关状态
+  const [processingStatus, setProcessingStatus] = useState('');
+  const [sseConnection, setSseConnection] = useState(null);
+  
   // 索引相关状态
   const [indexConfigVisible, setIndexConfigVisible] = useState(false);
   const [selectedIndexes, setSelectedIndexes] = useState([]); // 默认选择 player
@@ -213,6 +217,15 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
     fetchIndexes();
   }, []);
 
+  // 组件卸载时关闭SSE连接
+  useEffect(() => {
+    return () => {
+      if (sseConnection) {
+        sseConnection.close();
+      }
+    };
+  }, [sseConnection]);
+
 
   const handleSendMessage = async () => {
     if (!query.trim()) {
@@ -234,20 +247,27 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
 
     setConversations(prev => [...prev, userMessage]);
     setIsProcessing(true);
+    setProcessingStatus('开始处理请求...');
     setQuery('');
 
     try {
-      // 构建请求参数
+      // 关闭之前的SSE连接
+      if (sseConnection) {
+        sseConnection.close();
+      }
+
+      // 第一步：启动任务
       const requestData = {
-        index: selectedIndexes, // list
-        query: query, // str
-        desc: indexDescriptions, // dict
+        index: selectedIndexes,
+        query: query,
+        desc: indexDescriptions,
         model: model
       };
 
-      console.log('Sending request with data:', requestData);
+      console.log('Starting task with data:', requestData);
 
-      const response = await fetch('http://localhost:5000/api/nl', {
+      // POST请求启动任务
+      const response = await fetch('http://localhost:5000/api/nl-start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -259,24 +279,74 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const reply = await response.json();
+      const { task_id } = await response.json();
+      console.log('Task started with ID:', task_id);
 
-      const assistantMessage = {
-        id: Date.now() + 1,
-        type: 'assistant',
-        content: 'Based on the analysis of the document you provided, I have obtained the following information:',
-        output: JSON.stringify(reply),
-        timestamp: new Date().toLocaleTimeString(),
-        relatedDocs: reply.data?.doc || []
+      // 第二步：建立SSE连接监听进度
+      const eventSource = new EventSource(`http://localhost:5000/api/nl-events/${task_id}`);
+      setSseConnection(eventSource);
+
+      // 监听进度事件
+      eventSource.addEventListener('progress', (event) => {
+        try {
+          const taskInfo = JSON.parse(event.data);
+          // 更新处理状态
+          setProcessingStatus(taskInfo.description || '处理中...');
+        } catch (parseError) {
+          console.error('解析进度数据失败:', parseError);
+          setProcessingStatus('数据解析错误...');
+        }
+      });
+
+      // 监听结果事件
+      eventSource.addEventListener('result', (event) => {
+        try {
+          const resultData = JSON.parse(event.data);
+          
+          // 处理最终结果
+          const assistantMessage = {
+            id: Date.now() + 1,
+            type: 'assistant',
+            content: 'Based on the analysis of the document you provided, I have obtained the following information:',
+            output: JSON.stringify(resultData.data),
+            timestamp: new Date().toLocaleTimeString(),
+            relatedDocs: resultData.data?.doc || []
+          };
+          
+          setConversations(prev => [...prev, assistantMessage]);
+          setIsProcessing(false);
+          setProcessingStatus('');
+          eventSource.close();
+          setSseConnection(null);
+        } catch (parseError) {
+          console.error('解析结果数据失败:', parseError);
+          setProcessingStatus('结果解析错误...');
+        }
+      });
+
+      // 监听错误事件
+      eventSource.addEventListener('error', (event) => {
+        try {
+          const errorData = JSON.parse(event.data);
+          throw new Error(errorData.message || '任务处理失败');
+        } catch (parseError) {
+          throw new Error('任务处理失败');
+        }
+      });
+
+      eventSource.onerror = (error) => {
+        console.error('SSE连接错误:', error);
+        setIsProcessing(false);
+        setProcessingStatus('');
+        message.error('连接失败，请检查网络或服务器状态');
+        eventSource.close();
+        setSseConnection(null);
       };
-      
-      setConversations(prev => [...prev, assistantMessage]);
-      setIsProcessing(false);
 
-      
     } catch (error) {
       console.error('处理失败:', error);
       setIsProcessing(false);
+      setProcessingStatus('');
       message.error('处理失败: ' + error.message);
     }
   };
@@ -653,7 +723,9 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                 icon={<RobotOutlined />}
                 style={{ backgroundColor: '#52c41a', marginRight: 8 }}
               />
-              <Text type="secondary">AI is thinking...</Text>
+              <Text type="secondary">
+                {processingStatus || 'AI is thinking...'}
+              </Text>
             </div>
           )}
           
@@ -670,31 +742,6 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
           border: '1px solid #f0f0f0'
         }}>
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            {/* 当前配置显示 */}
-            {selectedIndexes.length > 0 && (
-              <div style={{ 
-                padding: '8px 12px', 
-                backgroundColor: '#f6ffed', 
-                borderRadius: '4px',
-                border: '1px solid #b7eb8f'
-              }}>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Selected Indexes: 
-                </Text>
-                <div style={{ marginTop: 4 }}>
-                  {selectedIndexes.map(index => (
-                    <Tag 
-                      key={index}
-                      color="green" 
-                      style={{ margin: '2px' }}
-                    >
-                      {index}
-                    </Tag>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <TextArea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
