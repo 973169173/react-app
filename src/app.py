@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file, Response, stream_with_context
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os
 import time
@@ -9,6 +9,13 @@ import pandas as pd
 import time
 import uuid
 import sys
+
+# Archive handling utilities (separated logic)
+try:
+    from archive_utils import extract_zip_archive, ArchiveExtractionError
+except Exception as _arch_e:
+    extract_zip_archive = None  # Fallback if file missing
+    print(f"[WARN] archive_utils not available: {_arch_e}")
 
 # 将 quest 项目加入 sys.path，便于直接导入后端实现
 QUEST_ROOT = '/data/guyang/quest'
@@ -23,7 +30,7 @@ except Exception as _e:
     print(f"[WARN] Failed to init OperationImplementation: {_e}")
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins="*", allow_headers="*")
+CORS(app)
 
 # 配置上传文件夹、数据文件夹和项目文件夹
 UPLOAD_FOLDER = 'files'
@@ -46,12 +53,14 @@ def extract_data():
     type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
     print(type,prompt,model,parameters);
     foname='nnnn'
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':foname})
@@ -62,164 +71,32 @@ def filter():
     print(request.json)
     type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
     print(type,prompt,model,parameters);
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':"1111"})
 
-@app.route('/api/nl-start', methods=['POST'])
-def nl_start():
-    """启动自然语言查询任务"""
-    try:
-        request_data = request.json or {}
-        query = request_data.get("query", "")
-        index = request_data.get("index", [])
-        desc = request_data.get("desc", {})
-        model = request_data.get("model", "gpt-4o")
-        
-        # 生成任务ID
-        task_id = str(int(time.time() * 1000))
-        
-        # 初始化任务描述
-        first_desc = f"开始处理查询: {query[:50]}..."
-        init_task(task_id, first_desc)
-        
-        # 启动后台任务
-        threading.Thread(target=run_task, args=(task_id,), daemon=True).start()
-        
-        return jsonify({"task_id": task_id})
-        
-    except Exception as e:
-        return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
-
-@app.route('/api/nl-events/<task_id>', methods=['GET'])
-def nl_events(task_id):
-    """获取任务进度的SSE流"""
-    def stream():
-        last = None
-        heartbeat_at = time.time()
-        while True:
-            snap = snapshot(task_id)
-            if not snap:
-                yield 'event: error\ndata: {"message":"task not found"}\n\n'
-                break
-
-            # 检查是否有结果数据
-            result_data = snap.get('result')
-            if result_data:
-                # 发送完成事件
-                final_result = {
-                    "type": "result",
-                    "data": result_data,
-                    "task_info": {
-                        "task_id": snap["task_id"],
-                        "started_at": snap["started_at"],
-                        "updated_at": snap["updated_at"],
-                        "description": snap["description"]
-                    }
-                }
-                yield "event: result\n"
-                yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
-                break
-
-            # 发送进度更新
-            payload = json.dumps(snap, ensure_ascii=False)
-            if payload != last:
-                last = payload
-                yield "event: progress\n"
-                yield f"data: {payload}\n\n"
-
-            # 心跳，避免代理断开
-            if time.time() - heartbeat_at > 10:
-                yield ": keep-alive\n\n"
-                heartbeat_at = time.time()
-
-            time.sleep(0.3)
-
-    return Response(stream(), headers={
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Cache-Control"
-    })
-
-@app.route('/api/nl-stream', methods=['GET'])
-def nl_stream():
-    """SSE流式处理自然语言查询"""
-    try:
-        # 从查询参数获取数据
-        data_param = request.args.get('data')
-        if not data_param:
-            return jsonify({'error': 'Missing data parameter'}), 400
-        
-        import json
-        request_data = json.loads(data_param)
-        table = request_data.get("index")
-        query = request_data.get("query")
-        desc = request_data.get("desc")
-        model = request_data.get("model", "gpt-4o")
-        
-        print(f"SSE Request - table: {table}, query: {query}, desc: {desc}, model: {model}")
-        
-        def generate():
-            """生成SSE数据流"""
-            try:
-                # 发送开始状态
-                yield f"data: {json.dumps({'type': 'status', 'message': '开始处理请求...'})}\n\n"
-                time.sleep(5)
-                # 发送分析文档状态
-                yield f"data: {json.dumps({'type': 'status', 'message': '正在分析文档...'})}\n\n"
-                time.sleep(5)
-                # 发送查询索引状态
-                yield f"data: {json.dumps({'type': 'status', 'message': '正在查询索引...'})}\n\n"
-                time.sleep(5)
-                # 发送生成回答状态
-                yield f"data: {json.dumps({'type': 'status', 'message': '正在生成回答...'})}\n\n"
-                time.sleep(5)
-                # 实际处理数据
-                data={
-                    'doc':['Aaron_Williams.txt','1111111','222222222'],
-                    'age':['30','12','212'],
-                    'name':['Aaron Williams','121','121'],
-                    '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-                    '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
-                }
-                df=pd.DataFrame(data)
-                result_data = df.to_dict(orient="split")
-                time.sleep(5)
-                # 发送处理完成状态
-                yield f"data: {json.dumps({'type': 'status', 'message': '处理完成！'})}\n\n"
-                time.sleep(5)
-                # 发送最终结果
-                yield f"data: {json.dumps({'type': 'result', 'data': result_data})}\n\n"
-                
-            except Exception as e:
-                # 发送错误状态
-                error_msg = f"处理失败: {str(e)}"
-                yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
-        
-        # 返回SSE响应
-        response = Response(
-            stream_with_context(generate()),
-            mimetype='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Cache-Control'
-            }
-        )
-        
-        return response
-        
-    except Exception as e:
-        return jsonify({'error': f'SSE处理失败: {str(e)}'}), 500
+@app.route('/api/nl',methods=['POST'])
+def nl():
+    content,model=request.json.get('content'),request.json.get('model')
+    # 增加测试数据到至少 12 条；_source_age 保持列表形式以模拟多段来源
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [[f'Age snippet A for User {i}', f'Age snippet B for User {i}'] for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
+    }
+    df=pd.DataFrame(data)
+    return jsonify(df.to_dict(orient="split"))
 
 
 # ==================== 数据分析（对接 quest.backend.interface.operation） ====================
@@ -302,12 +179,14 @@ def get_analysis_results_api():
 def sql_query():
     #time.sleep(2)
     sql,description,model = request.json.get('sql'), request.json.get('description'), request.json.get('model')
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify(df.to_dict(orient="split"))
@@ -966,47 +845,65 @@ def latest_sql():
 #文件相关
 @app.route('/api/upload', methods=['POST'])
 def upload_files():
+    """Upload endpoint with added ZIP archive extraction support.
+
+    - Accepts .txt, .pdf, and .zip (ZIP contents filtered to txt/pdf).
+    - Archive logic is delegated to archive_utils to keep this function slim.
+    - Returns metadata for each stored (or extracted) file just like before.
+    """
     try:
         uploaded_files = []
-        print(request.form)
+        archive_stats_summary = []  # Collect per-archive stats for message
         files = request.files.getlist('files')
-        folder_name = request.form.get('folder', '').strip()  # 获取文件夹名称
-        
-        # 如果指定了文件夹，创建文件夹路径
+        folder_name = request.form.get('folder', '').strip()
+
+        # Create / resolve upload directory
         if folder_name:
             folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder_name)
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+            os.makedirs(folder_path, exist_ok=True)
             upload_dir = folder_path
         else:
             upload_dir = app.config['UPLOAD_FOLDER']
-            folder_name = 'root'  # 根目录标识
-        
+            folder_name = 'root'
+
+        allowed_extensions = {'txt', 'pdf', 'zip'}
+
         for file in files:
-            if file.filename == '':
+            if not file or file.filename == '':
                 continue
-                
-            # 检查文件类型
-            allowed_extensions = {'txt', 'pdf'}
-            if not ('.' in file.filename and 
-                    file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if ext not in allowed_extensions:
                 return jsonify({'error': f'File {file.filename} format not supported'}), 400
-            
-            # 使用安全的原始文件名
+
+            if ext == 'zip':
+                if extract_zip_archive is None:
+                    return jsonify({'error': 'ZIP support not available on server'}), 500
+                try:
+                    extracted, stats = extract_zip_archive(
+                        file, upload_dir, folder_name,
+                        allowed_inner_ext=['txt', 'pdf']
+                    )
+                    uploaded_files.extend(extracted)
+                    archive_stats_summary.append(
+                        f"{file.filename}: {stats['extracted']} extracted, {stats['skipped_extension']} skipped(ext), {stats['skipped_other']} skipped(other)"
+                    )
+                except ArchiveExtractionError as ae:
+                    archive_stats_summary.append(f"{file.filename}: failed ({ae})")
+                except Exception as e:
+                    archive_stats_summary.append(f"{file.filename}: failed ({e})")
+                continue  # Skip normal single-file path
+
+            # Normal single file save path
             filename = secure_filename(file.filename)
             file_path = os.path.join(upload_dir, filename)
-            
-            # 如果文件已存在，直接跳过
             if os.path.exists(file_path):
+                # Skip duplicates silently (could add note later)
                 continue
-            
             file.save(file_path)
-            
-            # 获取文件信息
+
             file_size = os.path.getsize(file_path)
             upload_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-            
-            # 读取文件内容（仅文本文件）
             content = None
             if filename.lower().endswith('.txt'):
                 try:
@@ -1016,22 +913,24 @@ def upload_files():
                     try:
                         with open(file_path, 'r', encoding='gbk') as f:
                             content = f.read()
-                    except:
+                    except Exception:
                         content = None
-            
+
             uploaded_files.append({
-                'id': abs(hash(f"{folder_name}_{filename}")),  # 使用文件夹+文件名hash作为固定ID
+                'id': abs(hash(f"{folder_name}_{filename}")),
                 'name': filename,
                 'filename': filename,
-                'folder': folder_name,  # 添加文件夹信息
+                'folder': folder_name,
                 'content': content,
                 'size': file_size,
                 'type': 'application/pdf' if filename.lower().endswith('.pdf') else 'text/plain',
                 'uploadTime': upload_time
             })
-        
-        return jsonify({'files': uploaded_files, 'message': f'Successfully uploaded {len(uploaded_files)} files'})
-    
+
+        base_msg = f"Successfully processed {len(uploaded_files)} files"
+        if archive_stats_summary:
+            base_msg += " (" + "; ".join(archive_stats_summary) + ")"
+        return jsonify({'files': uploaded_files, 'message': base_msg})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
