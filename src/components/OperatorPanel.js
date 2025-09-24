@@ -19,7 +19,10 @@ import {
   NodeIndexOutlined,
   UpOutlined,
   DownOutlined,
-
+  ApiOutlined,
+  RobotOutlined,
+  ClockCircleOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import './OperatorPanel.css';
 import ResultViewer from './ResultViewer'; // 结果查看组件（以弹窗方式展示表格/图表等）
@@ -493,23 +496,33 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
         {isCollapsed ? (
           // 折叠状态下的简化视图
           <div className="operator-grid collapsed">
-            <div className="grid-row">
+            <div className="grid-row four-columns">
               <div className="grid-item">
-                <Text className="field-label">Type</Text>
+                <div className="field-icon-label">
+                  <ApiOutlined className="field-icon" />
+                  <Text className="field-label">Type</Text>
+                </div>
                 <Text strong>{operator.type}</Text>
               </div>
               <div className="grid-item">
-                <Text className="field-label">Model</Text>
+                <div className="field-icon-label">
+                  <RobotOutlined className="field-icon" />
+                  <Text className="field-label">Model</Text>
+                </div>
                 <Text strong>{operator.model}</Text>
               </div>
-            </div>
-            <div className="grid-row">
               <div className="grid-item">
-                <Text className="field-label">Token</Text>
+                <div className="field-icon-label">
+                  <ThunderboltOutlined className="field-icon" />
+                  <Text className="field-label">Token</Text>
+                </div>
                 <Text strong>{operator.tokenUsage || 0}</Text>
               </div>
               <div className="grid-item">
-                <Text className="field-label">Time</Text>
+                <div className="field-icon-label">
+                  <ClockCircleOutlined className="field-icon" />
+                  <Text className="field-label">Time</Text>
+                </div>
                 <Text strong>{operator.executionTime || 0}s</Text>
               </div>
             </div>

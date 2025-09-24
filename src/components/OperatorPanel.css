@@ -76,15 +76,41 @@
   grid-template-columns: 1fr;
 }
 
+/* 折叠状态下的四列布局 */
+.grid-row.four-columns {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 /* 网格项样式 */
 .grid-item {
   background: linear-gradient(135deg, #ffffff 0%, #f9fbff 100%);
   border: 1px solid rgba(99, 179, 237, 0.12);
   border-radius: 12px;
   padding: 12px 16px;
-  transition: all 0.25s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* 交错动画延迟 */
+.grid-item:nth-child(1) { animation-delay: 0.05s; }
+.grid-item:nth-child(2) { animation-delay: 0.1s; }
+.grid-item:nth-child(3) { animation-delay: 0.15s; }
+.grid-item:nth-child(4) { animation-delay: 0.2s; }
+
+/* 淡入向上动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .grid-item::before {
@@ -110,6 +136,21 @@
   opacity: 1;
 }
 
+/* 折叠状态下图标和标签的容器 */
+.field-icon-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* 字段图标样式 */
+.field-icon {
+  font-size: 12px;
+  color: #40a9ff;
+  opacity: 0.8;
+}
+
 /* 字段标签样式 */
 .field-label {
   display: block !important;
@@ -120,6 +161,15 @@
   letter-spacing: 0.5px !important;
   text-transform: uppercase !important;
   opacity: 0.8;
+}
+
+/* 折叠状态下的字段标签特殊样式 */
+.operator-grid.collapsed .field-label {
+  font-size: 10px !important;
+  color: #8c8c8c !important;
+  margin-bottom: 2px !important;
+  text-transform: uppercase !important;
+  font-weight: 500 !important;
 }
 
 /* 输入框和选择器美化 */
@@ -556,6 +606,12 @@
     gap: 12px;
   }
   
+  /* 移动端折叠视图调整为两列 */
+  .grid-row.four-columns {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px;
+  }
+  
   .operator-header {
     flex-direction: column;
     gap: 12px;
@@ -568,6 +624,18 @@
   
   .grid-item {
     padding: 10px 12px;
+  }
+  
+  .operator-grid.collapsed .grid-item {
+    padding: 5px 8px;
+  }
+  
+  .operator-grid.collapsed .field-icon {
+    font-size: 12px;
+  }
+  
+  .operator-grid.collapsed .ant-typography {
+    font-size: 12px;
   }
 }
 
@@ -608,7 +676,48 @@
 /* 折叠功能样式 */
 .operator-content {
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top;
+}
+
+/* 折叠状态的内容动画 */
+.operator-grid {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top;
+}
+
+.operator-grid.collapsed {
+  padding: 8px 0 4px 0;
+  animation: collapseIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 折叠动画关键帧 */
+@keyframes collapseIn {
+  from {
+    opacity: 0.7;
+    transform: scaleY(0.8) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+/* 展开动画关键帧 */
+@keyframes expandIn {
+  from {
+    opacity: 0.7;
+    transform: scaleY(0.9) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+/* 展开状态的动画 */
+.operator-grid:not(.collapsed) {
+  animation: expandIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .operator-grid.collapsed {
@@ -617,8 +726,32 @@
 
 .operator-grid.collapsed .grid-item {
   background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
-  border: 1px solid rgba(99, 179, 237, 0.1);
-  padding: 8px 12px;
+  border: 1px solid rgba(99, 179, 237, 0.08);
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(99, 179, 237, 0.05);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.operator-grid.collapsed .grid-item:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f6ff 100%);
+  border-color: rgba(64, 169, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(64, 169, 255, 0.1);
+  transform: translateY(-1px) scale(1.02);
+}
+
+/* 折叠状态下的字段图标优化 */
+.operator-grid.collapsed .field-icon {
+  font-size: 14px;
+  color: #40a9ff;
+  opacity: 0.9;
+  transition: all 0.2s ease;
+}
+
+.operator-grid.collapsed .grid-item:hover .field-icon {
+  color: #1890ff;
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 .operator-grid.collapsed .field-label {
@@ -628,8 +761,14 @@
 }
 
 .operator-grid.collapsed .ant-typography {
-  font-size: 12px;
-  color: #595959;
+  font-size: 13px;
+  color: #262626;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.operator-grid.collapsed .grid-item:hover .ant-typography {
+  color: #1890ff;
 }
 
 /* 折叠按钮样式 */
@@ -638,22 +777,42 @@
   color: #8c8c8c;
   border: none;
   background: transparent;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
 }
 
 .operator-actions .ant-btn[title="展开"]:hover,
 .operator-actions .ant-btn[title="折叠"]:hover {
   color: #40a9ff;
   background: rgba(64, 169, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.operator-actions .ant-btn[title="展开"] .anticon,
+.operator-actions .ant-btn[title="折叠"] .anticon {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.operator-actions .ant-btn[title="展开"]:hover .anticon {
+  transform: rotate(10deg);
+}
+
+.operator-actions .ant-btn[title="折叠"]:hover .anticon {
+  transform: rotate(-10deg);
 }
 
 /* 折叠状态下卡片高度优化 */
 .operator-card.collapsed {
-  margin-bottom: 12px !important;
+  margin-bottom: 10px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.operator-card.collapsed:hover {
+  box-shadow: 0 3px 15px rgba(99, 179, 237, 0.12) !important;
 }
 
 .operator-grid.collapsed .grid-row {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .operator-grid.collapsed .grid-row:last-child {

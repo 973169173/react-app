@@ -1,4 +1,5 @@
 import sys
+sys.path.append('/home/yuxinjiang/quest')  # 添加 quest 的父目录到 sys.path
 sys.path.insert(0, '/data/guyang/quest')  # 将内层 quest 设为包根
 
 
@@ -13,6 +14,10 @@ import pandas as pd
 import time
 import uuid
 import logging
+from quest.backend.interface.persistence import init_task, snapshot, update_task,complete_task
+from quest.backend.interface.nl import NLImplementation
+import threading
+from flask import Response
 
 app = Flask(__name__)
 app.debug = True
@@ -34,9 +39,10 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
         os.makedirs(folder)
 
 from quest.backend.interface.operation import OperationImplementation
+from quest.backend.interface.operation import OperationImplementation
 
 fun = OperationImplementation()
-
+fun1=NLImplementation()
 
 @app.route('/api/extract', methods=['POST'])
 def extract_data():
@@ -88,6 +94,106 @@ def retrieve():
         'table':df.to_dict(orient="split")})
 
 
+@app.route('/api/nl-start', methods=['POST'])
+def nl_start():
+    """启动自然语言查询任务"""
+    try:
+        request_data = request.json or {}
+        query = request_data.get("query", "")
+        index = request_data.get("index", [])
+        desc = request_data.get("desc", {})
+        model = request_data.get("model", "gpt-4o")
+        
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+        
+        # 初始化任务描述
+        first_desc = f"{query[:50]}..."
+        init_task(task_id, first_desc)
+        
+        # 启动后台任务（串行执行）
+        def execute_nl_pipeline():
+            try:
+                # 第一步：解析自然语言，获得分析结果
+                analysis_result = fun1.parse_nl(task_id, query)
+                
+                # 第二步：基于分析结果生成执行计划
+                plan_list = fun1.analysis_to_plan_list(analysis_result)
+                
+                # 第三步：执行第一个计划（通常取第一个计划）
+                if plan_list and len(plan_list) > 0:
+                    first_plan = plan_list[0]
+                    final_result = fun1.solve_plan(task_id, analysis_result, first_plan)
+                    
+                else:
+                    update_task(task_id, "No execution plan generated")
+                    return None
+                complete_task(task_id, fun1.show_origin_table())    
+                return True
+            except Exception as e:
+                update_task(task_id, f"Pipeline execution failed: {str(e)}")
+                return None
+        
+        threading.Thread(target=execute_nl_pipeline, daemon=True).start()
+
+        
+
+        return jsonify({"task_id": task_id})
+        
+    except Exception as e:
+        return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
+
+@app.route('/api/nl-events/<task_id>', methods=['GET'])
+def nl_events(task_id):
+    """获取任务进度的SSE流"""
+    def stream():
+        last = None
+        heartbeat_at = time.time()
+        while True:
+            snap = snapshot(task_id)
+            if not snap:
+                yield 'event: error\ndata: {"message":"task not found"}\n\n'
+                break
+
+            # 检查是否有结果数据
+            result_data = snap.get('result')
+            if result_data:
+                # 发送完成事件
+                final_result = {
+                    "type": "result",
+                    "data": result_data,
+                    "task_info": {
+                        "task_id": snap["task_id"],
+                        "started_at": snap["started_at"],
+                        "updated_at": snap["updated_at"],
+                        "description": snap["description"]
+                    }
+                }
+                yield "event: result\n"
+                yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
+                break
+
+            # 发送进度更新
+            payload = json.dumps(snap, ensure_ascii=False)
+            if payload != last:
+                last = payload
+                yield "event: progress\n"
+                yield f"data: {payload}\n\n"
+
+            # 心跳，避免代理断开
+            if time.time() - heartbeat_at > 10:
+                yield ": keep-alive\n\n"
+                heartbeat_at = time.time()
+
+            time.sleep(0.3)
+
+    return Response(stream(), headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control"
+    })
 
 @app.route('/api/nl',methods=['POST'])
 def nl():
