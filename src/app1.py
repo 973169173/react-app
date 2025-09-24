@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/yuxinjiang')  # 添加 quest 的父目录到 sys.path
+sys.path.insert(0, '/data/guyang/quest')  # 将内层 quest 设为包根
 
 
 from flask import Flask, jsonify, request, send_file
@@ -33,7 +33,7 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-from quest.quest.backend.interface.operation import OperationImplementation
+from quest.backend.interface.operation import OperationImplementation
 
 fun = OperationImplementation()
 
