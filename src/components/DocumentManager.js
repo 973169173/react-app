@@ -252,25 +252,24 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt',
+    accept: '.pdf,.txt,.zip',
     customRequest: handleCustomUpload,
     showUploadList: false,
     beforeUpload: (file) => {
-      const isValidType = file.type.includes('pdf') || 
-                         file.type.includes('text') || 
-                         file.name.toLowerCase().endsWith('.txt') ||
-                         file.name.toLowerCase().endsWith('.pdf');
+      const lower = file.name.toLowerCase();
+      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
+        file.type.includes('pdf') || file.type.includes('text');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
         return Upload.LIST_IGNORE;
       }
-      
+
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
         message.error(`${file.name} file size exceeds 10MB!`);
         return Upload.LIST_IGNORE;
       }
-      
+
       return true;
     },
   };
@@ -279,24 +278,23 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadModalProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt',
+    accept: '.pdf,.txt,.zip',
     showUploadList: true,
     beforeUpload: (file) => {
-      const isValidType = file.type.includes('pdf') || 
-                         file.type.includes('text') || 
-                         file.name.toLowerCase().endsWith('.txt') ||
-                         file.name.toLowerCase().endsWith('.pdf');
+      const lower = file.name.toLowerCase();
+      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
+        file.type.includes('pdf') || file.type.includes('text');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
         return false;
       }
-      
+
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
         message.error(`${file.name} file size exceeds 10MB!`);
         return false;
       }
-      
+
       setUploadingFiles(prev => [...prev, file]);
       return false; // 阻止自动上传
     },
