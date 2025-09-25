@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Card, Table, Space, Typography, Empty, Segmented, Select, Tooltip, Button, Alert, Divider, Switch, Statistic, Progress } from 'antd';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Card, Table, Space, Typography, Empty, Segmented, Select, Tooltip, Button, Alert, Divider, Switch, Statistic, Progress, message } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { ExportOutlined, BarChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
@@ -41,13 +41,22 @@ function inferFields(rows, columns) {
   return { numeric, categorical };
 }
 
-const ResultViewer = ({ resultJSON, onRowClick }) => {
+// Props:
+//  resultJSON: 原始表格结果（保持现有逻辑）
+//  onRowClick: 行点击回调
+//  analysisParams: { foName, tableName } 可选，如提供则展示“分析”模式
+const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
   const [vizType, setVizType] = useState('table');
   const [catField, setCatField] = useState(null);
   const [numField, setNumField] = useState(null);
   const [xField, setXField] = useState(null);
   const [yField, setYField] = useState(null);
   const [dense, setDense] = useState(true);
+  // 后端分析结果
+  const [analysisResults, setAnalysisResults] = useState([]);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState(null);
+  const hasAnalysisContext = !!(analysisParams?.foName && analysisParams?.tableName);
   // 简化交互：不再暴露排序和分组等高级选项
 
   // Parse and memoize
@@ -100,6 +109,110 @@ const ResultViewer = ({ resultJSON, onRowClick }) => {
       setVizType('column');
     }
   }, [vizType, timeFields]);
+
+  // 获取分析结果列表（仅当有 fo/table 并切换到 analysis 时）
+  useEffect(() => {
+    if (vizType !== 'analysis' || !hasAnalysisContext) return;
+    const controller = new AbortController();
+    async function fetchAnalysis() {
+      setAnalysisLoading(true);
+      try {
+        const qs = new URLSearchParams({ fo_name: analysisParams.foName, table_name: analysisParams.tableName });
+        const resp = await fetch(`http://localhost:5000/api/analysis-results?${qs.toString()}`, { signal: controller.signal });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const list = Array.isArray(data.results) ? data.results : [];
+        setAnalysisResults(list);
+        if (list.length && !selectedAnalysisId) setSelectedAnalysisId(list[0].chart_id || list[0].id || 0);
+      } catch (e) {
+        if (e.name !== 'AbortError') message.error('获取分析结果失败: ' + e.message);
+      } finally {
+        setAnalysisLoading(false);
+      }
+    }
+    fetchAnalysis();
+    return () => controller.abort();
+  }, [vizType, hasAnalysisContext, analysisParams, selectedAnalysisId]);
+
+  // 解析选择的后端分析图数据 -> echarts option
+  const analysisChartOption = useMemo(() => {
+    if (vizType !== 'analysis') return null;
+    if (!selectedAnalysisId) return null;
+    const row = analysisResults.find(r => String(r.chart_id || r.id) === String(selectedAnalysisId));
+    if (!row) return null;
+
+    // 通用解析函数
+    const parseMaybeArray = (raw) => {
+      if (raw == null) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw !== 'string') return [];
+      const t = raw.trim();
+      if (!t) return [];
+      try { const v = JSON.parse(t); if (Array.isArray(v)) return v; } catch {}
+      if (t.includes(',')) return t.split(',').map(s => s.trim()).filter(Boolean);
+      return [t];
+    };
+
+    const chartType = row.chart_type || row.type;
+    const title = row.title || chartType || 'Chart';
+    const labels = parseMaybeArray(row.labels);
+    const values = parseMaybeArray(row.values).map(v => Number(v));
+    const xData = parseMaybeArray(row.x_data);
+    const yData = parseMaybeArray(row.y_data).map(v => Number(v));
+    const palette = PIE_PALETTE;
+
+    // 根据 chart_type 构造
+    switch (chartType) {
+      case 'pie':
+        return {
+          title: { text: title, left: 'center' },
+            tooltip: { trigger: 'item' },
+            legend: { top: '6%', type: 'scroll' },
+            series: [{
+              name: title,
+              type: 'pie',
+              radius: ['40%', '70%'],
+              avoidLabelOverlap: true,
+              data: labels.map((l,i)=>({ name: l, value: values[i] })),
+            }],
+            color: palette,
+        };
+      case 'bar':
+        return {
+          title: { text: title },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          xAxis: { type: 'category', data: xData },
+          yAxis: { type: 'value' },
+          series: [{ type: 'bar', data: yData, barMaxWidth: 42 }],
+        };
+      case 'line':
+        return {
+          title: { text: title },
+          tooltip: { trigger: 'axis' },
+          xAxis: { type: 'category', data: xData },
+          yAxis: { type: 'value' },
+          series: [{ type: 'line', data: yData, smooth: true, areaStyle: {} }],
+        };
+      case 'scatter':
+        return {
+          title: { text: title },
+          tooltip: { trigger: 'item' },
+          xAxis: { type: 'value', name: row.x_label || 'X' },
+          yAxis: { type: 'value', name: row.y_label || 'Y' },
+          series: [{ type: 'scatter', data: xData.map((x,i)=>[Number(x), yData[i]]) }],
+        };
+      case 'histogram':
+        return {
+          title: { text: title },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          xAxis: { type: 'category', data: xData },
+          yAxis: { type: 'value' },
+          series: [{ type: 'bar', data: yData, barMaxWidth: 42 }],
+        };
+      default:
+        return null;
+    }
+  }, [vizType, analysisResults, selectedAnalysisId]);
 
   // Default sorting strategy per viz type
   React.useEffect(() => {
@@ -390,6 +503,7 @@ const ResultViewer = ({ resultJSON, onRowClick }) => {
           { label: '柱状', value: 'column', icon: <BarChartOutlined /> },
           { label: '折线', value: 'line', icon: <BarChartOutlined />, disabled: timeFields.length === 0 },
           { label: '散点', value: 'scatter', icon: <BarChartOutlined />, disabled: numeric.length === 0 },
+          ...(hasAnalysisContext ? [{ label: '分析', value: 'analysis', icon: <BarChartOutlined /> }] : []),
         ]}
         size="small"
       />
@@ -425,11 +539,16 @@ const ResultViewer = ({ resultJSON, onRowClick }) => {
         <Tooltip title="导出 CSV">
           <Button size="small" icon={<ExportOutlined />} onClick={() => exportCSV(rows, columns)}>CSV</Button>
         </Tooltip>
-        {vizType !== 'table' && (
+        {vizType !== 'table' && vizType !== 'analysis' && (
           <Tooltip title="导出图像 (PNG)">
             <Button size="small" onClick={() => exportChartPNG()} icon={<ExportOutlined />}>
               PNG
             </Button>
+          </Tooltip>
+        )}
+        {vizType === 'analysis' && (
+          <Tooltip title="导出图像 (PNG)">
+            <Button size="small" disabled={!analysisChartOption} onClick={() => exportChartPNG()} icon={<ExportOutlined />}>PNG</Button>
           </Tooltip>
         )}
       </Space>
@@ -450,13 +569,58 @@ const ResultViewer = ({ resultJSON, onRowClick }) => {
       return <Alert type="warning" message="返回内容无法识别" description="当前结果暂不支持可视化展示，请检查上游算子或切换其他可视化方式。" />;
     }
 
-    if (!isTabular) {
+    if (vizType !== 'analysis' && !isTabular) {
       return (
         <Alert
           type="info"
           message={<Space><InfoCircleOutlined /> 暂不支持该结果类型</Space>}
           description="当前结果不是表格数据，暂不提供 JSON 原文展示。请调整算子以输出表格数据，或导出 CSV 以便查看。"
         />
+      );
+    }
+
+    // Analysis 模式渲染
+    if (vizType === 'analysis') {
+      if (!hasAnalysisContext) {
+        return <Alert type="warning" message="缺少分析上下文" description="需要提供 foName 与 tableName 才能加载分析结果。" />;
+      }
+      return (
+        <div className="chart-area fade-in">
+          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+            <Space wrap>
+              <Select
+                style={{ minWidth: 220 }}
+                size="small"
+                loading={analysisLoading}
+                placeholder={analysisLoading ? '加载中...' : '选择分析图表'}
+                value={selectedAnalysisId}
+                onChange={setSelectedAnalysisId}
+                options={analysisResults.map(r => ({
+                  value: r.chart_id || r.id,
+                  label: `${r.chart_type || r.type || 'chart'} - ${r.title || r.column_name || r.chart_id}`
+                }))}
+                dropdownMatchSelectWidth={false}
+              />
+              <Button size="small" onClick={() => setVizType('table')}>返回表格</Button>
+              <Button size="small" onClick={() => setVizType('pie')}>本地可视化</Button>
+            </Space>
+            {!analysisResults.length && !analysisLoading && (
+              <Alert type="info" message="暂无分析结果" description="请先调用 /api/analyze-table 生成图表数据" />
+            )}
+            {analysisChartOption && (
+              <ReactECharts
+                option={analysisChartOption}
+                style={{ height: 420, width: '100%' }}
+                notMerge
+                lazyUpdate
+                opts={{ renderer: 'canvas' }}
+              />
+            )}
+            {!analysisChartOption && analysisResults.length > 0 && (
+              <Alert type="info" message="请选择一个图表" />
+            )}
+          </Space>
+        </div>
       );
     }
 
@@ -497,7 +661,7 @@ const ResultViewer = ({ resultJSON, onRowClick }) => {
     return (
       <>
         {contextBar()}
-        {vizType === 'table' ? (
+  {vizType === 'table' ? (
           <>
             <div className="result-context">
               <Text>本次查询到了符合条件的</Text>

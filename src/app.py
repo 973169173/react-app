@@ -46,6 +46,79 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+# ==================== 数据分析（对接 quest.backend.interface.operation） ====================
+@app.route('/api/analyze-table', methods=['POST'])
+def analyze_table_api():
+    """触发表格列分析，基于 OperationImplementation.analyze_table。
+
+    请求 JSON:
+      fo_name: FuncObject 名称 (必填)
+      table_name: 表名 (必填)
+      column_name: 要分析的列名 (必填)
+      analysis_type: auto|histogram|bar|pie|line|scatter (必填)
+      bins: (可选) 直方图分桶数量
+      title: (可选) 图表标题
+      model: (可选) 模型
+    返回: { message, new_function_name }
+    """
+    if _op_impl is None:
+        return jsonify({'error': 'backend not ready: OperationImplementation init failed'}), 500
+    try:
+        data = request.get_json(silent=True) or {}
+        fo_name = data.get('fo_name')
+        table_name = data.get('table_name')
+        column_name = data.get('column_name')
+        analysis_type = data.get('analysis_type')
+        bins = data.get('bins')
+        title = data.get('title')
+        model = data.get('model')
+
+        missing = [k for k, v in {
+            'fo_name': fo_name,
+            'table_name': table_name,
+            'column_name': column_name,
+            'analysis_type': analysis_type,
+        }.items() if not v]
+        if missing:
+            return jsonify({'error': f"missing fields: {', '.join(missing)}"}), 400
+
+        new_name = _op_impl.analyze_table(
+            fo_name=fo_name,
+            table_name=table_name,
+            column_name=column_name,
+            analysis_type=analysis_type,
+            bins=bins,
+            title=title,
+            model=model,
+        )
+        return jsonify({'message': 'analysis completed', 'new_function_name': new_name})
+    except Exception as e:
+        return jsonify({'error': f'analyze_table failed: {str(e)}'}), 500
+
+
+@app.route('/api/analysis-results', methods=['GET'])
+def get_analysis_results_api():
+    """获取某 FuncObject 某表的所有分析结果。
+
+    Query 参数:
+      fo_name: FuncObject 名称 (必填)
+      table_name: 表名 (必填)
+    返回: { results: [...], count }
+    注意: 后端存储的 x_data/y_data/labels/values 为字符串，需要前端自行解析成数组。
+    """
+    if _op_impl is None:
+        return jsonify({'error': 'backend not ready: OperationImplementation init failed'}), 500
+    try:
+        fo_name = (request.args.get('fo_name') or '').strip()
+        table_name = (request.args.get('table_name') or '').strip()
+        if not fo_name or not table_name:
+            return jsonify({'error': 'missing query params: fo_name, table_name'}), 400
+        df = _op_impl.get_analysis_results(fo_name=fo_name, table_name=table_name)
+        results = df.to_dict(orient='records') if df is not None else []
+        return jsonify({'results': results, 'count': len(results)})
+    except Exception as e:
+        return jsonify({'error': f'get_analysis_results failed: {str(e)}'}), 500
+
 @app.route('/api/extract', methods=['POST'])
 def extract_data():
     #time.sleep(10)
