@@ -6,6 +6,7 @@ import {
   DatabaseOutlined,
   FolderOpenOutlined
 } from '@ant-design/icons';
+import { useApiUrl } from '../configContext';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -23,6 +24,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [savedSQLs, setSavedSQLs] = useState([]);
   const [loadingSQLs, setLoadingSQLs] = useState(false);
+  const getApiUrl = useApiUrl();
 
   useEffect(() => {
     // 页面加载时不自动获取最新SQL数据
@@ -33,7 +35,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
     setIsRunning(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/sql', {
+  const response = await fetch(getApiUrl('/api/sql'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -71,7 +73,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
         timestamp: new Date().toLocaleString("sv-SE").replace(" ", "T")
       };
       
-      const response = await fetch('http://localhost:5000/api/save-sql', {
+  const response = await fetch(getApiUrl('/api/save-sql'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -100,7 +102,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
   const fetchSavedSQLRecords = async () => {
     try {
       setLoadingSQLs(true);
-      const response = await fetch('http://localhost:5000/api/sqls');
+  const response = await fetch(getApiUrl('/api/sqls'));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -119,7 +121,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
   // 加载指定的SQL记录
   const loadSQL = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/sqls/${filename}`);
+  const response = await fetch(getApiUrl(`/api/sqls/${filename}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -146,7 +148,7 @@ const SQLPanel = ({ documents, onRowClick }) => {
   // 删除SQL记录
   const deleteSQL = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/sqls/${filename}`, {
+  const response = await fetch(getApiUrl(`/api/sqls/${filename}`), {
         method: 'DELETE'
       });
       

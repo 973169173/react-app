@@ -11,6 +11,7 @@ import {
   SettingOutlined
 
 } from '@ant-design/icons';
+import { useApiUrl } from '../configContext';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -146,6 +147,7 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
 };
 
 const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
+  const getApiUrl = useApiUrl();
   const { message } = App.useApp();
   
   const [query, setQuery] = useState('what the age and team of Jay Fletcher Vincent?');
@@ -197,7 +199,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const fetchIndexes = async () => {
     setLoadingIndexes(true);
     try {
-      const response = await fetch('http://localhost:5000/api/indexes');
+    const response = await fetch(getApiUrl('/api/indexes'));
       if (!response.ok) {
         throw new Error("HTTP error!");
       }
@@ -267,7 +269,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       console.log('Starting task with data:', requestData);
 
       // POST请求启动任务
-      const response = await fetch('http://localhost:5000/api/nl-start', {
+  const response = await fetch(getApiUrl('/api/nl-start'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +285,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       console.log('Task started with ID:', task_id);
 
       // 第二步：建立SSE连接监听进度
-      const eventSource = new EventSource(`http://localhost:5000/api/nl-events/${task_id}`);
+  const eventSource = new EventSource(getApiUrl(`/api/nl-events/${task_id}`));
       setSseConnection(eventSource);
 
       // 监听进度事件
@@ -396,7 +398,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         timestamp: new Date().toLocaleString("sv-SE").replace(" ", "T")
       };
       
-      const response = await fetch('http://localhost:5000/api/save-conversation', {
+  const response = await fetch(getApiUrl('/api/save-conversation'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -425,7 +427,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const fetchSavedConversations = async () => {
     try {
       setLoadingConversations(true);
-      const response = await fetch('http://localhost:5000/api/conversations');
+  const response = await fetch(getApiUrl('/api/conversations'));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -444,7 +446,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   // 加载指定的对话记录
   const loadConversation = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${filename}`);
+  const response = await fetch(getApiUrl(`/api/conversations/${filename}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -471,7 +473,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   // 删除对话记录
   const deleteConversation = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${filename}`, {
+  const response = await fetch(getApiUrl(`/api/conversations/${filename}`), {
         method: 'DELETE'
       });
       

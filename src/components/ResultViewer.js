@@ -4,6 +4,7 @@ import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { ExportOutlined, BarChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import './ResultViewer.css';
+import { useApiUrl } from '../configContext';
 
 const { Text } = Typography;
 
@@ -46,6 +47,7 @@ function inferFields(rows, columns) {
 //  onRowClick: 行点击回调
 //  analysisParams: { foName, tableName } 可选，如提供则展示“分析”模式
 const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
+  const getApiUrl = useApiUrl();
   const [vizType, setVizType] = useState('table');
   const [catField, setCatField] = useState(null);
   const [numField, setNumField] = useState(null);
@@ -117,8 +119,8 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
     async function fetchAnalysis() {
       setAnalysisLoading(true);
       try {
-        const qs = new URLSearchParams({ fo_name: analysisParams.foName, table_name: analysisParams.tableName });
-        const resp = await fetch(`http://localhost:5000/api/analysis-results?${qs.toString()}`, { signal: controller.signal });
+  const qs = new URLSearchParams({ fo_name: analysisParams.foName, table_name: analysisParams.tableName });
+  const resp = await fetch(`${getApiUrl('/api/analysis-results')}?${qs.toString()}`, { signal: controller.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         const list = Array.isArray(data.results) ? data.results : [];
