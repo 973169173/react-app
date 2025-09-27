@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file, Response, stream_with_context
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os
 import time
@@ -17,7 +17,7 @@ from flask import Response
 
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins="*", allow_headers="*")
+CORS(app)
 
 # 配置上传文件夹、数据文件夹和项目文件夹
 UPLOAD_FOLDER = 'files'
@@ -33,6 +33,79 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+# ==================== 数据分析（对接 quest.backend.interface.operation） ====================
+@app.route('/api/analyze-table', methods=['POST'])
+def analyze_table_api():
+    """触发表格列分析，基于 OperationImplementation.analyze_table。
+
+    请求 JSON:
+      fo_name: FuncObject 名称 (必填)
+      table_name: 表名 (必填)
+      column_name: 要分析的列名 (必填)
+      analysis_type: auto|histogram|bar|pie|line|scatter (必填)
+      bins: (可选) 直方图分桶数量
+      title: (可选) 图表标题
+      model: (可选) 模型
+    返回: { message, new_function_name }
+    """
+    if _op_impl is None:
+        return jsonify({'error': 'backend not ready: OperationImplementation init failed'}), 500
+    try:
+        data = request.get_json(silent=True) or {}
+        fo_name = data.get('fo_name')
+        table_name = data.get('table_name')
+        column_name = data.get('column_name')
+        analysis_type = data.get('analysis_type')
+        bins = data.get('bins')
+        title = data.get('title')
+        model = data.get('model')
+
+        missing = [k for k, v in {
+            'fo_name': fo_name,
+            'table_name': table_name,
+            'column_name': column_name,
+            'analysis_type': analysis_type,
+        }.items() if not v]
+        if missing:
+            return jsonify({'error': f"missing fields: {', '.join(missing)}"}), 400
+
+        new_name = _op_impl.analyze_table(
+            fo_name=fo_name,
+            table_name=table_name,
+            column_name=column_name,
+            analysis_type=analysis_type,
+            bins=bins,
+            title=title,
+            model=model,
+        )
+        return jsonify({'message': 'analysis completed', 'new_function_name': new_name})
+    except Exception as e:
+        return jsonify({'error': f'analyze_table failed: {str(e)}'}), 500
+
+
+@app.route('/api/analysis-results', methods=['GET'])
+def get_analysis_results_api():
+    """获取某 FuncObject 某表的所有分析结果。
+
+    Query 参数:
+      fo_name: FuncObject 名称 (必填)
+      table_name: 表名 (必填)
+    返回: { results: [...], count }
+    注意: 后端存储的 x_data/y_data/labels/values 为字符串，需要前端自行解析成数组。
+    """
+    if _op_impl is None:
+        return jsonify({'error': 'backend not ready: OperationImplementation init failed'}), 500
+    try:
+        fo_name = (request.args.get('fo_name') or '').strip()
+        table_name = (request.args.get('table_name') or '').strip()
+        if not fo_name or not table_name:
+            return jsonify({'error': 'missing query params: fo_name, table_name'}), 400
+        df = _op_impl.get_analysis_results(fo_name=fo_name, table_name=table_name)
+        results = df.to_dict(orient='records') if df is not None else []
+        return jsonify({'results': results, 'count': len(results)})
+    except Exception as e:
+        return jsonify({'error': f'get_analysis_results failed: {str(e)}'}), 500
+
 @app.route('/api/extract', methods=['POST'])
 def extract_data():
     #time.sleep(10)
@@ -40,12 +113,14 @@ def extract_data():
     type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
     print(type,prompt,model,parameters);
     foname='nnnn'
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':foname})
@@ -56,12 +131,14 @@ def filter():
     print(request.json)
     type,prompt,model,parameters=request.json.get('type'),request.json.get('prompt'),request.json.get('model'),request.json.get('parameters');
     print(type,prompt,model,parameters);
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':"1111"})
@@ -382,12 +459,14 @@ def nl_stream():
 def sql_query():
     #time.sleep(2)
     sql,description,model = request.json.get('sql'), request.json.get('description'), request.json.get('model')
-    data={
-        'doc':['Aaron_Williams.txt','1111111','222222222'],
-        'age':['30','12','212'],
-        'name':['Aaron Williams','121','121'],
-        '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-        '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # 增加测试数据到至少 12 条
+    n = 12
+    data = {
+        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
+        'age': [str(19 + i) for i in range(1, n+1)],
+        'name': [f'User {i}' for i in range(1, n+1)],
+        '_source_age': [f'Age info for User {i}' for i in range(1, n+1)],
+        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
     }
     df=pd.DataFrame(data)
     return jsonify(df.to_dict(orient="split"))
@@ -1046,47 +1125,65 @@ def latest_sql():
 #文件相关
 @app.route('/api/upload', methods=['POST'])
 def upload_files():
+    """Upload endpoint with added ZIP archive extraction support.
+
+    - Accepts .txt, .pdf, and .zip (ZIP contents filtered to txt/pdf).
+    - Archive logic is delegated to archive_utils to keep this function slim.
+    - Returns metadata for each stored (or extracted) file just like before.
+    """
     try:
         uploaded_files = []
-        print(request.form)
+        archive_stats_summary = []  # Collect per-archive stats for message
         files = request.files.getlist('files')
-        folder_name = request.form.get('folder', '').strip()  # 获取文件夹名称
-        
-        # 如果指定了文件夹，创建文件夹路径
+        folder_name = request.form.get('folder', '').strip()
+
+        # Create / resolve upload directory
         if folder_name:
             folder_path = os.path.join(app.config['UPLOAD_FOLDER'], folder_name)
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+            os.makedirs(folder_path, exist_ok=True)
             upload_dir = folder_path
         else:
             upload_dir = app.config['UPLOAD_FOLDER']
-            folder_name = 'root'  # 根目录标识
-        
+            folder_name = 'root'
+
+        allowed_extensions = {'txt', 'pdf', 'zip'}
+
         for file in files:
-            if file.filename == '':
+            if not file or file.filename == '':
                 continue
-                
-            # 检查文件类型
-            allowed_extensions = {'txt', 'pdf'}
-            if not ('.' in file.filename and 
-                    file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if ext not in allowed_extensions:
                 return jsonify({'error': f'File {file.filename} format not supported'}), 400
-            
-            # 使用安全的原始文件名
+
+            if ext == 'zip':
+                if extract_zip_archive is None:
+                    return jsonify({'error': 'ZIP support not available on server'}), 500
+                try:
+                    extracted, stats = extract_zip_archive(
+                        file, upload_dir, folder_name,
+                        allowed_inner_ext=['txt', 'pdf']
+                    )
+                    uploaded_files.extend(extracted)
+                    archive_stats_summary.append(
+                        f"{file.filename}: {stats['extracted']} extracted, {stats['skipped_extension']} skipped(ext), {stats['skipped_other']} skipped(other)"
+                    )
+                except ArchiveExtractionError as ae:
+                    archive_stats_summary.append(f"{file.filename}: failed ({ae})")
+                except Exception as e:
+                    archive_stats_summary.append(f"{file.filename}: failed ({e})")
+                continue  # Skip normal single-file path
+
+            # Normal single file save path
             filename = secure_filename(file.filename)
             file_path = os.path.join(upload_dir, filename)
-            
-            # 如果文件已存在，直接跳过
             if os.path.exists(file_path):
+                # Skip duplicates silently (could add note later)
                 continue
-            
             file.save(file_path)
-            
-            # 获取文件信息
+
             file_size = os.path.getsize(file_path)
             upload_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-            
-            # 读取文件内容（仅文本文件）
             content = None
             if filename.lower().endswith('.txt'):
                 try:
@@ -1096,22 +1193,24 @@ def upload_files():
                     try:
                         with open(file_path, 'r', encoding='gbk') as f:
                             content = f.read()
-                    except:
+                    except Exception:
                         content = None
-            
+
             uploaded_files.append({
-                'id': abs(hash(f"{folder_name}_{filename}")),  # 使用文件夹+文件名hash作为固定ID
+                'id': abs(hash(f"{folder_name}_{filename}")),
                 'name': filename,
                 'filename': filename,
-                'folder': folder_name,  # 添加文件夹信息
+                'folder': folder_name,
                 'content': content,
                 'size': file_size,
                 'type': 'application/pdf' if filename.lower().endswith('.pdf') else 'text/plain',
                 'uploadTime': upload_time
             })
-        
-        return jsonify({'files': uploaded_files, 'message': f'Successfully uploaded {len(uploaded_files)} files'})
-    
+
+        base_msg = f"Successfully processed {len(uploaded_files)} files"
+        if archive_stats_summary:
+            base_msg += " (" + "; ".join(archive_stats_summary) + ")"
+        return jsonify({'files': uploaded_files, 'message': base_msg})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

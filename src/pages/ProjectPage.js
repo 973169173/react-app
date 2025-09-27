@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, List, Typography, Space, Input, Modal, Form, message, Select } from 'antd';
 import { PlusOutlined, FolderOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons';
 import OperatorPanel from '../components/OperatorPanel';
+import { useApiUrl } from '../configContext';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -16,12 +17,13 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
   const [indexOptions, setIndexOptions] = useState([]);
   const [loadingIndexes, setLoadingIndexes] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const getApiUrl = useApiUrl();
 
   // 获取项目列表
   const fetchProjects = async () => {
     setLoadingProjects(true);
     try {
-      const response = await fetch('http://localhost:5000/api/projects');
+  const response = await fetch(getApiUrl('/api/projects'));
       if (!response.ok) {
         throw new Error('Failed to fetch projects');
       }
@@ -39,7 +41,7 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
   const fetchIndexes = async () => {
     setLoadingIndexes(true);
     try {
-      const response = await fetch('http://localhost:5000/api/indexes');
+  const response = await fetch(getApiUrl('/api/indexes'));
       if (!response.ok) {
         throw new Error('Failed to fetch indexes');
       }
@@ -80,7 +82,7 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
       const values = await form.validateFields();
       console.log('Form values:', values);
       // 调用后端创建项目接口
-      const response = await fetch('http://localhost:5000/api/projects', {
+  const response = await fetch(getApiUrl('/api/projects'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +126,7 @@ const ProjectPage = ({ documents, onRowClick, onBackToProjects }) => {
       content: 'Are you sure you want to delete this project? This action cannot be undone.',
       onOk: async () => {
         try {
-          const response = await fetch(`http://localhost:5000/api/projects/${projectId}`, {
+          const response = await fetch(getApiUrl(`/api/projects/${projectId}`), {
             method: 'DELETE',
           });
 

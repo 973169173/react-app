@@ -12,10 +12,12 @@ import {
   FolderOpenOutlined,
   PlusOutlined
 } from '@ant-design/icons';
+import { useApiUrl } from '../configContext';
 
 const { Text, Paragraph } = Typography;
 
 const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumentsSet, onDocumentPreview }) => {
+  const getApiUrl = useApiUrl();
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewDocument, setPreviewDocument] = useState(null);
   const [expandedDocIds, setExpandedDocIds] = useState([]);
@@ -40,7 +42,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   useEffect(() => {
     const loadDocuments = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/documents');
+  const response = await fetch(getApiUrl('/api/documents'));
         if (response.ok) {
           const serverDocuments = await response.json();
           // 直接设置文档列表，而不是逐个添加
@@ -98,7 +100,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     if (document.type.includes('pdf') || document.name.toLowerCase().endsWith('.pdf')) {
       // 对于PDF文件，从服务器下载并打开
       try {
-        const response = await fetch(`http://localhost:5000/api/documents/${document.filename}/download`);
+  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
         if (response.ok) {
           const blob = await response.blob();
           const fileURL = URL.createObjectURL(blob);
@@ -132,7 +134,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+  const response = await fetch(getApiUrl('/api/upload'), {
         method: 'POST',
         body: formData,
       });
@@ -179,7 +181,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+  const response = await fetch(getApiUrl('/api/upload'), {
         method: 'POST',
         body: formData,
       });
@@ -212,7 +214,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
   const handleDeleteDocument = async (doc) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/documents/${doc.filename}`, {
+  const response = await fetch(getApiUrl(`/api/documents/${doc.filename}`), {
         method: 'DELETE',
       });
 
@@ -232,7 +234,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
   const handleDownload = async (document) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/documents/${document.filename}/download`);
+  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -252,25 +254,24 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt',
+    accept: '.pdf,.txt,.zip',
     customRequest: handleCustomUpload,
     showUploadList: false,
     beforeUpload: (file) => {
-      const isValidType = file.type.includes('pdf') || 
-                         file.type.includes('text') || 
-                         file.name.toLowerCase().endsWith('.txt') ||
-                         file.name.toLowerCase().endsWith('.pdf');
+      const lower = file.name.toLowerCase();
+      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
+        file.type.includes('pdf') || file.type.includes('text');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
         return Upload.LIST_IGNORE;
       }
-      
+
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
         message.error(`${file.name} file size exceeds 10MB!`);
         return Upload.LIST_IGNORE;
       }
-      
+
       return true;
     },
   };
@@ -279,24 +280,23 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const uploadModalProps = {
     name: 'files',
     multiple: true,
-    accept: '.pdf,.txt',
+    accept: '.pdf,.txt,.zip',
     showUploadList: true,
     beforeUpload: (file) => {
-      const isValidType = file.type.includes('pdf') || 
-                         file.type.includes('text') || 
-                         file.name.toLowerCase().endsWith('.txt') ||
-                         file.name.toLowerCase().endsWith('.pdf');
+      const lower = file.name.toLowerCase();
+      const isValidType = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.zip') ||
+        file.type.includes('pdf') || file.type.includes('text');
       if (!isValidType) {
-        message.error(`${file.name} format not supported, only PDF and TXT formats are allowed!`);
+        message.error(`${file.name} format not supported, only PDF, TXT and ZIP formats are allowed!`);
         return false;
       }
-      
+
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
         message.error(`${file.name} file size exceeds 10MB!`);
         return false;
       }
-      
+
       setUploadingFiles(prev => [...prev, file]);
       return false; // 阻止自动上传
     },
@@ -548,7 +548,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
     try {
       setBuildingIndex(true);
-      const response = await fetch('http://localhost:5000/api/build-index', {
+  const response = await fetch(getApiUrl('/api/build-index'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

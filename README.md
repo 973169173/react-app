@@ -2,6 +2,10 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## API configuration
+
+The frontend reads its backend endpoint from `src/configContext.js`. By default it points to `http://localhost:3456`, but you can override it by setting the environment variable `REACT_APP_API_BASE_URL` (for example in a `.env` file at the project root) or by editing the default value in that file. Once changed, restart the dev server so the new value takes effect.
+
 ## Available Scripts
 
 In the project directory, you can run:
