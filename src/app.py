@@ -8,8 +8,12 @@ from werkzeug.utils import secure_filename
 import pandas as pd
 import time
 import uuid
+
+from quest.backend.interface.persistence import init_task, snapshot, update_task,complete_task
+from quest.backend.interface.nl import NLImplementation
 import threading
-from store import init_task, snapshot
+from flask import Response
+
 
 
 app = Flask(__name__)
@@ -62,6 +66,144 @@ def filter():
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':"1111"})
 
+@app.route('/api/nl-parse', methods=['POST'])
+def nl_parse():
+    """第一步：解析自然语言，返回算子集合"""
+    try:
+        request_data = request.json or {}
+        query = request_data.get("query", "")
+        
+        if not query.strip():
+            return jsonify({'error': '查询不能为空'}), 400
+        
+        # 调用解析函数 - 这里先用模拟数据
+        # analysis_result = fun1.parse_nl(query)
+        
+        # 模拟数据 - 实际应该从 fun1.parse_nl 获取
+        analysis_result = {
+            'Extract': {
+                'age': {
+                    'description': 'the age of the player',
+                    'op': 'extract_age',
+                    'field_type': 'numeric',
+                    'required': True
+                },
+                'team': {
+                    'description': 'the team name of the player',
+                    'op': 'extract_team',
+                    'field_type': 'text',
+                    'required': True
+                },
+                'position': {
+                    'description': 'the playing position of the player',
+                    'op': 'extract_position',
+                    'field_type': 'text',
+                    'required': False
+                }
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'analysis_result': analysis_result,
+            'query': query
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'解析失败: {str(e)}'}), 500
+
+@app.route('/api/nl-plan', methods=['POST'])
+def nl_plan():
+    """第二步：基于分析结果生成执行计划"""
+    try:
+        request_data = request.json or {}
+        analysis_result = request_data.get("analysis_result", {})
+        
+        if not analysis_result:
+            return jsonify({'error': '缺少分析结果'}), 400
+        
+        # 调用计划生成函数 - 这里先用模拟数据
+        # plan_list = fun1.analysis_to_plan_list(analysis_result)
+        
+        # 模拟数据 - 实际应该从 fun1.analysis_to_plan_list 获取
+        plan_list = [
+            {
+                'id': 1,
+                'name': '提取玩家基本信息',
+                'description': '从文档中提取年龄、队伍和位置信息',
+                'steps': [
+                    'Extract age from player documents',
+                    'Extract team from player documents', 
+                    'Extract position from player documents'
+                ],
+                'estimated_time': '2-3 seconds',
+                'operators': ['Extract_age', 'Extract_team', 'Extract_position']
+            },
+            {
+                'id': 2,
+                'name': '高级信息检索',
+                'description': '使用语义检索获取更详细的玩家信息',
+                'steps': [
+                    'Semantic search for player details',
+                    'Filter by age and team criteria',
+                    'Retrieve additional player statistics'
+                ],
+                'estimated_time': '3-5 seconds',
+                'operators': ['SemanticRetrieval', 'Filter', 'Aggregate']
+            }
+        ]
+        
+        return jsonify({
+            'success': True,
+            'plan_list': plan_list,
+            'total_plans': len(plan_list)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'生成计划失败: {str(e)}'}), 500
+
+@app.route('/api/nl-execute', methods=['POST'])
+def nl_execute():
+    """第三步：执行选定的计划"""
+    try:
+        request_data = request.json or {}
+        analysis_result = request_data.get("analysis_result", {})
+        selected_plan = request_data.get("selected_plan", {})
+        
+        if not analysis_result or not selected_plan:
+            return jsonify({'error': '缺少必要参数'}), 400
+        
+        # 生成任务ID用于跟踪
+        task_id = str(int(time.time() * 1000))
+        
+        # 调用执行函数 - 这里先用模拟数据
+        # fo_name = fun1.solve_plan(task_id, analysis_result, selected_plan)
+        # result_data = fun1.show_origin_table()
+        
+        # 模拟数据 - 实际应该从 fun1.solve_plan 和 show_origin_table 获取
+        fo_name = f"execution_result_{task_id}"
+        result_data = {
+            "columns": ["player_name", "age", "team", "position"],
+            "data": [
+                ["Jay Fletcher Vincent", 28, "Lakers", "Point Guard"],
+                ["Michael Jordan", 35, "Bulls", "Shooting Guard"],
+                ["LeBron James", 39, "Lakers", "Small Forward"]
+            ],
+            "index": [0, 1, 2],
+            "doc": ["Jay_Fletcher_Vincent.txt", "Michael_Jordan.txt", "LeBron_James.txt"]
+        }
+        
+        return jsonify({
+            'success': True,
+            'fo_name': fo_name,
+            'result_data': result_data,
+            'task_id': task_id,
+            'executed_plan': selected_plan
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'执行失败: {str(e)}'}), 500
+
 @app.route('/api/nl-start', methods=['POST'])
 def nl_start():
     """启动自然语言查询任务"""
@@ -76,12 +218,36 @@ def nl_start():
         task_id = str(int(time.time() * 1000))
         
         # 初始化任务描述
-        first_desc = f"开始处理查询: {query[:50]}..."
+        first_desc = f"{query[:50]}..."
         init_task(task_id, first_desc)
         
-        # 启动后台任务
-        threading.Thread(target=run_task, args=(task_id,), daemon=True).start()
+        # # 启动后台任务（串行执行）
+        # def execute_nl_pipeline():
+        #     try:
+        #         # 第一步：解析自然语言，获得分析结果
+        #         analysis_result = fun1.parse_nl(task_id, query)
+                
+        #         # 第二步：基于分析结果生成执行计划
+        #         plan_list = fun1.analysis_to_plan_list(analysis_result)
+                
+        #         # 第三步：执行第一个计划（通常取第一个计划）
+        #         if plan_list and len(plan_list) > 0:
+        #             first_plan = plan_list[0]
+        #             final_result = fun1.solve_plan(task_id, analysis_result, first_plan)
+                    
+        #         else:
+        #             update_task(task_id, "No execution plan generated")
+        #             return None
+        #         complete_task(task_id, fun1.show_origin_table())    
+        #         return True
+        #     except Exception as e:
+        #         update_task(task_id, f"Pipeline execution failed: {str(e)}")
+        #         return None
         
+        threading.Thread(target=fun1.parse_nl,args=(task_id), daemon=True).start()
+
+        
+
         return jsonify({"task_id": task_id})
         
     except Exception as e:

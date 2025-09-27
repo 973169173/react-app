@@ -92,8 +92,8 @@ def retrieve():
         'table':df.to_dict(orient="split")})
 
 
-@app.route('/api/nl-start', methods=['POST'])
-def nl_start():
+@app.route('/api/nl-parse-start', methods=['POST'])
+def nl_parse():
     """启动自然语言查询任务"""
     try:
         request_data = request.json or {}
@@ -109,40 +109,109 @@ def nl_start():
         first_desc = f"{query[:50]}..."
         init_task(task_id, first_desc)
         
-        # 启动后台任务（串行执行）
-        def execute_nl_pipeline():
-            try:
-                # 第一步：解析自然语言，获得分析结果
-                analysis_result = fun1.parse_nl(task_id, query)
-                
-                # 第二步：基于分析结果生成执行计划
-                plan_list = fun1.analysis_to_plan_list(analysis_result)
-                
-                # 第三步：执行第一个计划（通常取第一个计划）
-                if plan_list and len(plan_list) > 0:
-                    first_plan = plan_list[0]
-                    final_result = fun1.solve_plan(task_id, analysis_result, first_plan)
-                    
-                else:
-                    update_task(task_id, "No execution plan generated")
-                    return None
-                complete_task(task_id, fun1.show_origin_table())    
-                return True
-            except Exception as e:
-                update_task(task_id, f"Pipeline execution failed: {str(e)}")
-                return None
+        def parse():
+            analysis_result=fun1.parse_nl(task_id, query)
+            print("analysis_result:", analysis_result)
+            complete_task(task_id, analysis_result)
         
-        threading.Thread(target=execute_nl_pipeline, daemon=True).start()
-
-        
+        threading.Thread(target=parse ,daemon=True).start()
 
         return jsonify({"task_id": task_id})
         
     except Exception as e:
         return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
+    
 
-@app.route('/api/nl-events/<task_id>', methods=['GET'])
-def nl_events(task_id):
+@app.route('/api/nl-plan-start', methods=['POST'])
+def nl_plan():
+    """启动计划生成任务"""
+    try:
+        request_data = request.json or {}
+        print("Plan request data:", request_data)
+        analysis_result = request_data.get("analysis_result", {})
+        
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+        
+        # 初始化任务描述
+        first_desc = "Generating execution plans..."
+        init_task(task_id, first_desc)
+        
+        def plan():
+            try:
+                update_task(task_id, "Starting plan generation...")
+                print("Calling analysis_to_plan_list with:", analysis_result)
+                plan_list = fun1.analysis_to_plan_list(analysis_result)
+                print("Generated plan_list:", plan_list)
+                update_task(task_id, "Plan generation completed")
+                complete_task(task_id, plan_list)
+            except Exception as e:
+                print(f"Plan generation error: {e}")
+                import traceback
+                traceback.print_exc()
+                update_task(task_id, f"Plan generation failed: {str(e)}")
+
+        threading.Thread(target=plan, daemon=True).start()
+
+        return jsonify({"task_id": task_id})
+        
+    except Exception as e:
+        print(f"nl-plan-start error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
+
+
+@app.route('/api/nl-execute-start', methods=['POST'])
+def nl_execute():
+    """启动执行任务"""
+    try:
+        request_data = request.json or {}
+        print("Execute request data:", request_data)
+        analysis_result = request_data.get("analysis_result", {})
+        selected_plan = request_data.get("selected_plan", {})
+
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+        
+        # 初始化任务描述
+        plan_name = selected_plan.get('name', 'Unknown Plan') if isinstance(selected_plan, dict) else str(selected_plan)
+        first_desc = f"Executing plan: {plan_name}"
+        init_task(task_id, first_desc)
+        
+        def execute():
+            try:
+                update_task(task_id, "Starting execution...")
+                print("Calling solve_plan with:", analysis_result, selected_plan)
+                foname = fun1.solve_plan(task_id,analysis_result, selected_plan)
+                print("Got foname:", foname)
+                
+                update_task(task_id, "Getting results...")
+                result_data = fun1.show_table_with_source()
+                print("Got result_data:", result_data)
+                
+                update_task(task_id, "Execution completed")
+                complete_task(task_id, result_data)
+            except Exception as e:
+                print(f"Execution error: {e}")
+                import traceback
+                traceback.print_exc()
+                update_task(task_id, f"Execution failed: {str(e)}")
+        
+        threading.Thread(target=execute, daemon=True).start()
+
+        return jsonify({"task_id": task_id})
+        
+    except Exception as e:
+        print(f"nl-execute-start error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
+
+
+
+@app.route('/api/nl-parse-events/<task_id>', methods=['GET'])
+def nl_parse_events(task_id):
     """获取任务进度的SSE流"""
     def stream():
         last = None
@@ -159,7 +228,7 @@ def nl_events(task_id):
                 # 发送完成事件
                 final_result = {
                     "type": "result",
-                    "data": result_data,
+                    "result": result_data,
                     "task_info": {
                         "task_id": snap["task_id"],
                         "started_at": snap["started_at"],
@@ -167,7 +236,7 @@ def nl_events(task_id):
                         "description": snap["description"]
                     }
                 }
-                yield "event: result\n"
+                yield "event: complete\n"
                 yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
                 break
 
@@ -192,6 +261,114 @@ def nl_events(task_id):
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Cache-Control"
     })
+
+
+@app.route('/api/nl-plan-events/<task_id>', methods=['GET'])
+def nl_plan_events(task_id):
+    """获取任务进度的SSE流"""
+    def stream():
+        last = None
+        heartbeat_at = time.time()
+        while True:
+            snap = snapshot(task_id)
+            if not snap:
+                yield 'event: error\ndata: {"message":"task not found"}\n\n'
+                break
+
+            # 检查是否有结果数据
+            result_data = snap.get('result')
+            if result_data:
+                # 发送完成事件
+                final_result = {
+                    "type": "result",
+                    "result": result_data,
+                    "task_info": {
+                        "task_id": snap["task_id"],
+                        "started_at": snap["started_at"],
+                        "updated_at": snap["updated_at"],
+                        "description": snap["description"]
+                    }
+                }
+                yield "event: complete\n"
+                yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
+                break
+
+            # 发送进度更新
+            payload = json.dumps(snap, ensure_ascii=False)
+            if payload != last:
+                last = payload
+                yield "event: progress\n"
+                yield f"data: {payload}\n\n"
+
+            # 心跳，避免代理断开
+            if time.time() - heartbeat_at > 10:
+                yield ": keep-alive\n\n"
+                heartbeat_at = time.time()
+
+            time.sleep(0.3)
+
+    return Response(stream(), headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control"
+    })
+
+
+@app.route('/api/nl-execute-events/<task_id>', methods=['GET'])
+def nl_excute_events(task_id):
+    """获取任务进度的SSE流"""
+    def stream():
+        last = None
+        heartbeat_at = time.time()
+        while True:
+            snap = snapshot(task_id)
+            if not snap:
+                yield 'event: error\ndata: {"message":"task not found"}\n\n'
+                break
+
+            # 检查是否有结果数据
+            result_data = snap.get('result')
+            if not result_data.empty:
+                # 发送完成事件
+                final_result = {
+                    "type": "result",
+                    "result": result_data,
+                    "task_info": {
+                        "task_id": snap["task_id"],
+                        "started_at": snap["started_at"],
+                        "updated_at": snap["updated_at"],
+                        "description": snap["description"]
+                    }
+                }
+                yield "event: complete\n"
+                yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
+                break
+            
+            # 发送进度更新
+            payload = json.dumps(snap, ensure_ascii=False)
+            if payload != last:
+                last = payload
+                yield "event: progress\n"
+                yield f"data: {payload}\n\n"
+
+            # 心跳，避免代理断开
+            if time.time() - heartbeat_at > 10:
+                yield ": keep-alive\n\n"
+                heartbeat_at = time.time()
+
+            time.sleep(0.3)
+
+    return Response(stream(), headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control"
+    })
+
+
 
 @app.route('/api/nl',methods=['POST'])
 def nl():
