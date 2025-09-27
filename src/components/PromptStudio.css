@@ -428,18 +428,21 @@
   background: white;
   border-radius: 8px;
   padding: 16px;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
 }
 
 .nl-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .nl-header h4 {
@@ -447,8 +450,11 @@
 }
 
 .nl-content {
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 120px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
 }
 
 .conversation-card {
@@ -674,6 +680,40 @@
   font-weight: 600;
 }
 
+/* 自然语言页面特殊布局优化 */
+.nl-section .nl-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(249, 250, 251, 0.8) 100%);
+  border-radius: 20px;
+  height: 100%; /* 确保填满容器 */
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* 对话历史区域 - 最大化空间利用 */
+.nl-section .nl-content > div:first-child {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 12px;
+  margin-bottom: 8px; /* 减少与输入框的间距 */
+}
+
+/* 输入区域 - 紧贴底部 */
+.nl-section .nl-content > div:last-child {
+  flex-shrink: 0;
+  margin-top: 0; /* 移除顶部间距 */
+  padding: 20px;
+  background-color: white;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(249, 250, 251, 0.9) 100%);
+}
+
 /* 输入框聚焦效果 */
 .ant-input:focus,
 .ant-input-focused {
@@ -684,4 +724,20 @@
 .ant-select-focused .ant-select-selector {
   border-color: #40a9ff !important;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+/* 停止按钮样式 */
+.nl-section .ant-btn-primary.ant-btn-dangerous {
+  transition: all 0.2s ease;
+}
+
+.nl-section .ant-btn-primary.ant-btn-dangerous:hover {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5) !important;
+}
+
+.nl-section .ant-btn-primary.ant-btn-dangerous:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
 }

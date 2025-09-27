@@ -8,7 +8,8 @@ import {
   RobotOutlined,
   FolderOpenOutlined,
   DatabaseOutlined,
-  SettingOutlined
+  SettingOutlined,
+  StopOutlined
 
 } from '@ant-design/icons';
 import { useApiUrl } from '../configContext';
@@ -74,7 +75,7 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
               <Button size="small" onClick={handleClearAll}>
                 Clear All
               </Button>
-              <Text type="secondary">
+              <Text style={{ color: '#666666' }}>
                 Selected: {localSelectedIndexes.length} / {availableIndexes.length}
               </Text>
             </Space>
@@ -97,7 +98,7 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
                       value={typeof index === 'string' ? index : index.id}>
                 <div>
                   <div>{typeof index === 'string' ? index : index.name}</div>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                  <Text style={{ color: '#666666', fontSize: '12px' }}>
                     {typeof index === 'string' ? '' : (index.description || '')}
                   </Text>
                 </div>
@@ -136,7 +137,7 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
               ))}
             </Space>
           ) : (
-            <Text type="secondary" style={{ fontStyle: 'italic' }}>
+                        <Text style={{ color: '#666666', fontStyle: 'italic' }}>
               Please select indexes first to configure their descriptions.
             </Text>
           )}
@@ -212,7 +213,7 @@ const EditableParseItem = ({ originalKey, info, onEdit, onDelete }) => {
         <div style={{ flex: 1 }}>
           <Text strong>{key}</Text>
           <br />
-          <Text type="secondary">{description}</Text>
+          <Text style={{ color: '#666666' }}>{description}</Text>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Space>
@@ -274,11 +275,11 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       type: 'assistant',
       content: 'I found that your document contains information about several NBA players.',
       output: JSON.stringify({
-        columns: ['document_name', 'player_type', 'status', '_source_document_name'],
+        columns: ['document_name', 'player_type', '_source_document_name'],
         data: [
-          ['Aaron_Williams.txt', 'NBA Player', 'Active'],
-          ['Andre_Drummond.txt', 'NBA Player', 'Active'],
-          ['Angelo_Russell.txt', 'NBA Player', 'Active']
+          ['Aaron_Williams.txt', 'NBA Player'],
+          ['Andre_Drummond.txt', 'NBA Player'],
+          ['Angelo_Russell.txt', 'NBA Player']
         ],
         index: [0, 1, 2]
       }),
@@ -322,6 +323,30 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
     };
   }, [sseConnections]);
 
+  // 停止当前处理
+  const handleStopProcessing = () => {
+    // 关闭所有活跃的SSE连接
+    Object.values(sseConnections).forEach(connection => {
+      if (connection) {
+        connection.close();
+      }
+    });
+    
+    // 清理状态
+    setSseConnections({});
+    setActiveTasks({});
+    setIsProcessing(false);
+    setProcessingStatus('');
+    setCurrentStep(null);
+    setCurrentQuery('');
+    setParseResult(null);
+    setEditableParseResult(null);
+    setPlanList([]);
+    setSelectedPlan(null);
+    
+    message.info('Processing stopped by user');
+  };
+
 
   const handleSendMessage = async () => {
     if (!query.trim()) {
@@ -357,7 +382,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       setProcessingStatus('Starting parse task...');
 
       // 第一步：启动任务
-      const startResponse = await fetch('http://localhost:5000/api/nl-parse-start', {
+      const startResponse = await fetch(getApiUrl('/api/nl-parse-start'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -374,7 +399,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       const { task_id } = await startResponse.json();
       
       // 第二步：监听进度事件
-      const eventSource = new EventSource(`http://localhost:5000/api/nl-parse-events/${task_id}`);
+      const eventSource = new EventSource(getApiUrl(`/api/nl-parse-events/${task_id}`));
       
       // 保存连接引用
       setSseConnections(prev => ({ ...prev, parse: eventSource }));
@@ -603,7 +628,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       setConversations(prev => [...prev, planMessage]);
 
       // 第一步：启动任务
-      const startResponse = await fetch('http://localhost:5000/api/nl-execute-start', {
+      const startResponse = await fetch(getApiUrl('/api/nl-execute-start'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -619,7 +644,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       const { task_id } = await startResponse.json();
       
       // 第二步：监听进度事件
-      const eventSource = new EventSource(`http://localhost:5000/api/nl-execute-events/${task_id}`);
+      const eventSource = new EventSource(getApiUrl(`/api/nl-execute-events/${task_id}`));
       
       // 保存连接引用
       setSseConnections(prev => ({ ...prev, execute: eventSource }));
@@ -864,13 +889,69 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
 
   return (
     <div className="nl-section">
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { left: -100%; }
+          100% { left: 100%; }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 0.2; transform: scale(1.02); }
+        }
+        
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+          50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.5), 0 0 30px rgba(34, 197, 94, 0.3); }
+        }
+        
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        .conversation-message {
+          margin-bottom: 20px;
+          padding: 0;
+          border: none;
+          border-radius: 16px;
+          background: white;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+          transition: all 0.2s ease;
+        }
+        
+        .conversation-message:hover {
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-message {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+          border: 1px solid rgba(59, 130, 246, 0.1);
+        }
+        
+        .assistant-message {
+          background: rgba(249, 250, 251, 0.8);
+          border: 1px solid rgba(229, 231, 235, 0.5);
+        }
+      `}</style>
       <div className="nl-header">
         <div>
           <Title level={4}>
             <MessageOutlined style={{ marginRight: 8 }} />
             Natural Language Interface
           </Title>
-          <Text type="secondary">Use natural language processing documents</Text>
+          <Text style={{ color: '#666666' }}>Use natural language processing documents</Text>
         </div>
 
         <Space>
@@ -921,48 +1002,73 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         display: 'flex', 
         flexDirection: 'column', 
         height: '100%',
-        gap: '16px'
+        gap: '20px',
+        padding: '20px',
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(249, 250, 251, 0.8) 100%)',
+        borderRadius: '20px'
       }}>
         {/* 对话历史区域 */}
         <div style={{ 
           flex: 1,
           overflowY: 'auto',
-          paddingRight: '8px',
-          minHeight: 0
+          paddingRight: '12px',
+          minHeight: 0,
+          
+          padding: '20px 20px 20px 0'
         }}>
           {conversations.map((item) => (
-            <div key={item.id} style={{ 
-              marginBottom: '16px', 
-              padding: '12px',
-              border: '1px solid #f0f0f0',
-              borderRadius: '8px',
-              backgroundColor: item.type === 'user' ? '#f6ffed' : '#fff7e6'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div 
+              key={item.id} 
+              className={`conversation-message ${
+                item.type === 'user' ? 'user-message' : 'assistant-message'
+              }`}
+              style={{ padding: '20px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
                 <Avatar 
                   icon={item.type === 'user' ? <UserOutlined /> : <RobotOutlined />}
+                  size={40}
                   style={{ 
-                    backgroundColor: item.type === 'user' ? '#1890ff' : '#52c41a',
+                    background: item.type === 'user' 
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
+                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    border: 'none',
+                    boxShadow: item.type === 'user' 
+                      ? '0 4px 12px rgba(59, 130, 246, 0.3)'
+                      : '0 4px 12px rgba(22, 163, 74, 0.3)',
                     flexShrink: 0
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ marginBottom: '8px' }}>
-                    <Space>
-                      <Text strong>
+                  <div style={{ marginBottom: '12px' }}>
+                    <Space align="center">
+                      <Text strong style={{ 
+                        fontSize: '15px',
+                        color: item.type === 'user' ? '#3b82f6' : '#16a34a',
+                        fontWeight: '600'
+                      }}>
                         {item.type === 'user' ? 'You' : 'Assistant'}
                       </Text>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                      <div style={{
+                        width: '4px',
+                        height: '4px',
+                        borderRadius: '50%',
+                        backgroundColor: '#d1d5db'
+                      }} />
+                      <Text style={{ color: '#6b7280', fontSize: '13px', fontWeight: '500' }}>
                         {item.timestamp}
                       </Text>
                     </Space>
                   </div>
                   
-                  <div style={{ marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '12px' }}>
                     <Text style={{ 
                       whiteSpace: 'pre-wrap', 
                       wordBreak: 'break-word',
-                      display: 'block'
+                      display: 'block',
+                      fontSize: '15px',
+                      lineHeight: '1.6',
+                      color: '#1f2937'
                     }}>
                       {item.content}
                     </Text>
@@ -978,9 +1084,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                               <div>
                                 <Text strong>{key}</Text>: <Text>{info.description}</Text>
                                 <br />
-                                <Text type="secondary">
-                                  Type: {info.field_type}, Required: {info.required ? 'Yes' : 'No'}
-                                </Text>
+
                               </div>
                             </Card>
                           ))}
@@ -997,14 +1101,14 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                           <div>
                             <Text strong>Selected Plan</Text>
                             <div style={{ marginTop: 8 }}>
-                              <Text type="secondary">Steps:</Text>
+                              <Text style={{ color: '#666666' }}>Steps:</Text>
                               {Array.isArray(item.selectedPlan) ? (
                                 <div style={{ marginTop: 4 }}>
                                   {item.selectedPlan.map((step, index) => (
                                     <div key={index} style={{ marginBottom: 6, paddingLeft: 12 }}>
                                       <Text strong style={{ fontSize: '13px' }}>{step.name}:</Text>
                                       <br />
-                                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                                      <Text style={{ color: '#666666', fontSize: '12px' }}>
                                         {step.description}
                                       </Text>
                                     </div>
@@ -1012,7 +1116,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                                 </div>
                               ) : (
                                 <div style={{ marginTop: 4 }}>
-                                  <Text type="secondary">No steps available</Text>
+                                  <Text style={{ color: '#666666' }}>No steps available</Text>
                                 </div>
                               )}
                             </div>
@@ -1086,7 +1190,22 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                                           onRowClick(record, columnKey);
                                         }
                                       },
-                                      style: { cursor: 'pointer' }
+                                      style: { 
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease'
+                                      },
+                                      onMouseEnter: (event) => {
+                                        const row = event.currentTarget;
+                                        row.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(147, 51, 234, 0.04) 100%)';
+                                        row.style.transform = 'translateY(-1px)';
+                                        row.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.15)';
+                                      },
+                                      onMouseLeave: (event) => {
+                                        const row = event.currentTarget;
+                                        row.style.background = '';
+                                        row.style.transform = 'translateY(0)';
+                                        row.style.boxShadow = '';
+                                      }
                                     })}
                                   />
                                 );
@@ -1105,16 +1224,41 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                   
                   {item.relatedDocs && (
                     <div style={{ marginTop: 8 }}>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                      <Text style={{ color: '#666666', fontSize: '12px' }}>
                         Related documents: 
                       </Text>
-                      <div style={{ marginTop: 4 }}>
+                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {item.relatedDocs.map(doc => (
                           <Tag 
                             key={doc}
-                            color="blue" 
-                            style={{ margin: '2px', cursor: 'pointer' }}
+                            style={{ 
+                              margin: 0,
+                              cursor: 'pointer',
+                              borderRadius: '8px',
+                              border: '1px solid #3b82f6',
+                              background: 'rgba(59, 130, 246, 0.08)',
+                              color: '#3b82f6',
+                              fontWeight: '600',
+                              padding: '4px 12px',
+                              fontSize: '13px',
+                              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                              boxShadow: '0 1px 3px rgba(59, 130, 246, 0.1)'
+                            }}
                             onClick={() => handleDocumentClick(doc)}
+                            onMouseEnter={(e) => {
+                              e.target.style.background = 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)';
+                              e.target.style.color = 'white';
+                              e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                              e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                              e.target.style.borderColor = '#3b82f6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.background = 'rgba(59, 130, 246, 0.08)';
+                              e.target.style.color = '#3b82f6';
+                              e.target.style.transform = 'translateY(0) scale(1)';
+                              e.target.style.boxShadow = '0 1px 3px rgba(59, 130, 246, 0.1)';
+                              e.target.style.borderColor = '#3b82f6';
+                            }}
                           >
                             {doc}
                           </Tag>
@@ -1127,26 +1271,32 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
             </div>
           ))}
           
-          {/* 步骤显示区域 */}
-          {currentStep && (
+          {/* 步骤显示区域 - 只在有内容且不在处理中时显示 */}
+          {currentStep && !isProcessing && (
             <div style={{ 
-              padding: '16px',
-              border: '1px solid #f0f0f0',
-              borderRadius: '8px',
-              backgroundColor: '#f6ffed',
-              marginBottom: '16px'
+              padding: '20px',
+              border: 'none',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(22, 163, 74, 0.05)',
+              marginBottom: '20px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
                 <Avatar 
                   icon={<RobotOutlined />}
-                  style={{ backgroundColor: '#52c41a', flexShrink: 0 }}
+                  size={40}
+                  style={{ 
+                    backgroundColor: '#16a34a', 
+                    flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                  }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Parse 阶段显示 */}
                   {currentStep === 'parse' && editableParseResult && (
                     <div>
-                      <Text strong>Parse Results - Please review and modify if needed:</Text>
-                      <div style={{ marginTop: 12 }}>
+                      <Text strong style={{ fontSize: '16px', color: '#1f2937' }}>Parse Results - Please review and modify if needed:</Text>
+                      <div style={{ marginTop: 16 }}>
                         {Object.entries(editableParseResult.Extract || {}).map(([key, info]) => (
                           <EditableParseItem
                             key={key}
@@ -1157,10 +1307,17 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                           />
                         ))}
                       </div>
-                      <div style={{ marginTop: 16, textAlign: 'right' }}>
+                      <div style={{ marginTop: 20, textAlign: 'right' }}>
                         <Button 
                           type="primary" 
+                          size="large"
                           onClick={handleSaveEditedParseResult}
+                          style={{
+                            borderRadius: '8px',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            border: 'none',
+                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)'
+                          }}
                         >
                           Continue to Plan Generation
                         </Button>
@@ -1171,41 +1328,221 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                   {/* Plan 阶段显示 */}
                   {currentStep === 'plan' && planList.length > 0 && (
                     <div>
-                      <Text strong>Available Execution Plans - Please select one:</Text>
-                      <div style={{ marginTop: 12 }}>
+                      <div style={{ marginBottom: 20 }}>
+                        <Text strong style={{ 
+                          fontSize: '18px', 
+                          color: '#1f2937',
+                          display: 'block',
+                          marginBottom: '8px'
+                        }}>Available Execution Plans</Text>
+                        <Text style={{ 
+                          color: '#6b7280', 
+                          fontSize: '14px',
+                          fontWeight: '500'
+                        }}>Choose the plan that best fits your requirements</Text>
+                      </div>
+                      
+                      <div style={{ marginTop: 20 }}>
                         <Radio.Group 
                           onChange={(e) => setSelectedPlan(planList[parseInt(e.target.value)])}
                           value={selectedPlan ? planList.indexOf(selectedPlan) : undefined}
+                          style={{ width: '100%' }}
                         >
-                          <Space direction="vertical" style={{ width: '100%' }}>
-                            {planList.map((plan, planIndex) => (
-                              <Radio key={planIndex} value={planIndex}>
-                                <Card size="small" style={{ marginLeft: 8, width: 'calc(100% - 24px)' }}>
-                                  <div>
-                                    <Text strong>Plan {planIndex + 1}</Text>
-                                    <div style={{ marginTop: 8 }}>
-                                      {Array.isArray(plan) && plan.map((step, stepIndex) => (
-                                        <div key={stepIndex} style={{ marginBottom: 8, paddingLeft: 16 }}>
-                                          <Text strong style={{ fontSize: '13px' }}>{step.name}:</Text>
-                                          <br />
-                                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {planList.map((plan, planIndex) => {
+                              const isSelected = selectedPlan && planList.indexOf(selectedPlan) === planIndex;
+                              return (
+                                <div 
+                                  key={planIndex}
+                                  style={{
+                                    position: 'relative',
+                                    borderRadius: '16px',
+                                    border: isSelected 
+                                      ? '2px solid rgba(34, 197, 94, 0.5)' 
+                                      : '2px solid rgba(229, 231, 235, 0.6)',
+                                    background: isSelected 
+                                      ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(21, 128, 61, 0.06) 100%)'
+                                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 250, 251, 0.95) 100%)',
+                                    padding: '24px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    boxShadow: isSelected 
+                                      ? '0 8px 25px rgba(34, 197, 94, 0.15), 0 3px 10px rgba(34, 197, 94, 0.1)'
+                                      : '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06)',
+                                    transform: isSelected ? 'translateY(-2px)' : 'translateY(0)',
+                                    overflow: 'hidden'
+                                  }}
+                                  onClick={() => setSelectedPlan(plan)}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.06)';
+                                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 51, 234, 0.02) 100%)';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06)';
+                                      e.currentTarget.style.borderColor = 'rgba(229, 231, 235, 0.6)';
+                                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 250, 251, 0.95) 100%)';
+                                    }
+                                  }}
+                                >
+                                  {/* 选中指示器 - 简化版本 */}
+                                  {isSelected && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '-2px',
+                                      left: '-2px',
+                                      right: '-2px',
+                                      bottom: '-2px',
+                                      borderRadius: '18px',
+                                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(21, 128, 61, 0.08) 100%)',
+                                      zIndex: -1
+                                    }} />
+                                  )}
+                                  
+                                  {/* Radio 按钮 - 简化处理 */}
+                                  <Radio value={planIndex} style={{ 
+                                    position: 'absolute', 
+                                    top: '20px', 
+                                    right: '0px'
+                                  }}>
+                                    <span style={{ display: 'none' }}>Select</span>
+                                  </Radio>
+                                  
+                                  {/* 计划标题 */}
+                                  <div style={{ marginBottom: '16px', paddingRight: '40px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                      <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '8px',
+                                        background: isSelected 
+                                          ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.6) 0%, rgba(21, 128, 61, 0.5) 100%)'
+                                          : 'linear-gradient(135deg, rgba(156, 163, 175, 0.4) 0%, rgba(107, 114, 128, 0.3) 100%)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'white',
+                                        fontWeight: '700',
+                                        fontSize: '14px',
+                                        boxShadow: isSelected 
+                                          ? '0 1px 6px rgba(34, 197, 94, 0.1)'
+                                          : '0 1px 3px rgba(156, 163, 175, 0.1)'
+                                      }}>
+                                        {planIndex + 1}
+                                      </div>
+                                      <Text strong style={{ 
+                                        fontSize: '16px', 
+                                        color: isSelected ? 'rgba(1, 70, 51, 0.7)' : 'rgba(12, 14, 17, 0.7)',
+                                        fontWeight: '600'
+                                      }}>Plan {planIndex + 1}</Text>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 计划步骤 */}
+                                  <div style={{ paddingLeft: '0px' }}>
+                                    {Array.isArray(plan) && plan.map((step, stepIndex) => (
+                                      <div key={stepIndex} style={{ 
+                                        marginBottom: stepIndex === plan.length - 1 ? 0 : '16px',
+                                        padding: '16px 20px',
+                                        backgroundColor: isSelected 
+                                          ? 'rgba(34, 197, 94, 0.04)'
+                                          : 'rgba(255, 255, 255, 0.8)',
+                                        borderRadius: '12px',
+                                        border: '2px solid ' + (isSelected ? 'rgba(34, 197, 94, 0.2)' : 'rgba(243, 244, 246, 0.8)'),
+                                        position: 'relative',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: isSelected 
+                                          ? '0 2px 8px rgba(34, 197, 94, 0.08)'
+                                          : '0 1px 3px rgba(0, 0, 0, 0.05)'
+                                      }}>
+                                        {/* 步骤数字 */}
+                                        <div style={{
+                                          position: 'absolute',
+                                          left: '-10px',
+                                          top: '16px',
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '50%',
+                                          background: isSelected 
+                                            ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' 
+                                            : 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+                                          color: 'white',
+                                          fontSize: '12px',
+                                          fontWeight: '700',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: isSelected 
+                                            ? '0 2px 6px rgba(34, 197, 94, 0.3)'
+                                            : '0 1px 3px rgba(156, 163, 175, 0.3)',
+                                          border: '2px solid white'
+                                        }}>
+                                          {stepIndex + 1}
+                                        </div>
+                                        
+                                        <div style={{ marginLeft: '16px' }}>
+                                          <Text strong style={{ 
+                                            fontSize: '14px', 
+                                            color: isSelected ? 'rgba(1, 5, 4, 0.75)' : 'rgba(0, 0, 0, 0.75)',
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: '600'
+                                          }}>{step.name}</Text>
+                                          <Text style={{ 
+                                            color: isSelected ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.6)', 
+                                            fontSize: '13px',
+                                            lineHeight: '1.5',
+                                            fontWeight: '400'
+                                          }}>
                                             {step.description}
                                           </Text>
                                         </div>
-                                      ))}
-                                    </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                </Card>
-                              </Radio>
-                            ))}
-                          </Space>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </Radio.Group>
                       </div>
-                      <div style={{ marginTop: 16, textAlign: 'right' }}>
+                      <div style={{ 
+                        marginTop: 32, 
+                        display: 'flex', 
+                        justifyContent: 'right',
+                        paddingTop: '24px',
+                        borderTop: '1px solid #f3f4f6'
+                      }}>
                         <Button 
                           type="primary" 
+                          size="large"
                           disabled={selectedPlan === null || selectedPlan === undefined}
                           onClick={() => startExecuteStep(selectedPlan)}
+                          style={{
+                            borderRadius: '8px',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            border: 'none',
+                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (selectedPlan) {
+                              e.target.style.transform = 'translateY(-3px) scale(1.05)';
+                              e.target.style.boxShadow = '0 8px 25px rgba(34, 197, 94, 0.4), 0 4px 12px rgba(34, 197, 94, 0.3)';
+                              e.target.style.background = 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (selectedPlan) {
+                              e.target.style.transform = 'translateY(0) scale(1)';
+                              e.target.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+                              e.target.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+                            }
+                          }}
                         >
                           Execute Selected Plan
                         </Button>
@@ -1217,22 +1554,79 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
             </div>
           )}
 
+          {/* 现代化的处理状态显示 */}
           {isProcessing && (
             <div style={{ 
-              textAlign: 'center', 
-              padding: '16px',
-              border: '1px solid #f0f0f0',
-              borderRadius: '8px',
-              backgroundColor: '#fff7e6',
-              marginBottom: '16px'
+              padding: '20px',
+              border: 'none',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.06) 0%, rgba(249, 115, 22, 0.06) 100%)',
+              marginBottom: '20px',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
-              <Avatar 
-                icon={<RobotOutlined />}
-                style={{ backgroundColor: '#52c41a', marginRight: 8 }}
-              />
-              <Text type="secondary">
-                {processingStatus || 'AI is thinking...'}
-              </Text>
+              {/* 动画背景 */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(251, 146, 60, 0.06), transparent)',
+                animation: 'shimmer 2s infinite'
+              }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+                <div style={{ position: 'relative' }}>
+                  <Avatar 
+                    icon={<RobotOutlined />}
+                    size={40}
+                    style={{ 
+                      background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.9) 0%, rgba(249, 115, 22, 0.9) 100%)',
+                      border: 'none',
+                      boxShadow: '0 3px 10px rgba(251, 146, 60, 0.3)'
+                    }}
+                  />
+                  {/* 脉冲动画 */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    left: '-2px',
+                    right: '-2px',
+                    bottom: '-2px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.6) 0%, rgba(249, 115, 22, 0.6) 100%)',
+                    opacity: 0.2,
+                    animation: 'pulse 2s infinite'
+                  }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Text style={{ 
+                    color: '#1f2937', 
+                    fontWeight: '600',
+                    fontSize: '16px',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}>
+                    {processingStatus || 'AI is thinking...'}
+                  </Text>
+                  <div style={{ 
+                    height: '4px', 
+                    backgroundColor: 'rgba(251, 146, 60, 0.12)', 
+                    borderRadius: '2px',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: '100%',
+                      background: 'linear-gradient(90deg, rgba(251, 146, 60, 0.8), rgba(249, 115, 22, 0.8))',
+                      borderRadius: '2px',
+                      animation: 'loading 2s infinite'
+                    }} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           
@@ -1243,10 +1637,12 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         {/* 输入区域 */}
         <div style={{ 
           flexShrink: 0,
-          padding: '16px',
+          padding: '24px',
           backgroundColor: 'white',
-          borderRadius: '8px',
-          border: '1px solid #f0f0f0'
+          borderRadius: '16px',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(249, 250, 251, 0.9) 100%)'
         }}>
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             <TextArea
@@ -1255,21 +1651,92 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
               placeholder="Please describe the information you want to know in natural language."
               rows={4}
               onKeyDown={handleKeyPress}
+              style={{
+                borderRadius: '12px',
+                border: '2px solid #e5e7eb',
+                fontSize: '15px',
+                lineHeight: '1.6',
+                padding: '16px',
+                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.04)',
+                transition: 'all 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.boxShadow = 'inset 0 2px 4px rgba(0, 0, 0, 0.04), 0 0 0 3px rgba(59, 130, 246, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e5e7eb';
+                e.target.style.boxShadow = 'inset 0 2px 4px rgba(0, 0, 0, 0.04)';
+              }}
             />
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                Press Ctrl/Cmd + Enter to send quickly
+              <Text style={{ 
+                color: '#6b7280', 
+                fontSize: '13px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{
+                  padding: '4px 8px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  color: 'rgba(59, 130, 246, 0.8)',
+                  fontWeight: '600'
+                }}>
+                  Ctrl+Enter
+                </span>
+                to send quickly
               </Text>
-              <Button 
-                type="primary" 
-                icon={<SendOutlined />}
-                onClick={handleSendMessage}
-                loading={isProcessing}
-                disabled={!query.trim()  }
-              >
-                {currentStep ? 'Processing...' : 'Send Message'}
-              </Button>
+              {isProcessing ? (
+                <Button 
+                  type="primary" 
+                  danger
+                  icon={<StopOutlined />}
+                  onClick={handleStopProcessing}
+                  size="large"
+                  style={{
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    height: '48px',
+                    paddingLeft: '24px',
+                    paddingRight: '24px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Stop Processing
+                </Button>
+              ) : (
+                <Button 
+                  type="primary" 
+                  icon={<SendOutlined />}
+                  onClick={handleSendMessage}
+                  disabled={!query.trim()}
+                  size="large"
+                  style={{
+                    borderRadius: '12px',
+                    background: !query.trim() ? undefined : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    border: 'none',
+                    boxShadow: !query.trim() ? undefined : '0 4px 12px rgba(59, 130, 246, 0.4)',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    height: '48px',
+                    paddingLeft: '24px',
+                    paddingRight: '24px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Send Message
+                </Button>
+              )}
             </div>
           </Space>
         </div>
@@ -1315,10 +1782,10 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                 title={conversationConfig.name || conversationConfig.filename}
                 description={
                   <Space direction="vertical" size="small">
-                    <Text type="secondary">
+                    <Text style={{ color: '#666666' }}>
                       Modified time: {conversationConfig.modified_time}
                     </Text>
-                    <Text type="secondary">
+                    <Text style={{ color: '#666666' }}>
                       Model: {conversationConfig.model || 'Unknown'} | 
                       {conversationConfig.description || 'No description'}
                     </Text>

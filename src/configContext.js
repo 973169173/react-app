@@ -3,7 +3,7 @@ import React, { createContext, useContext, useCallback } from 'react';
 const envApiBaseUrl = process.env.REACT_APP_API_BASE_URL?.trim();
 
 export const defaultConfig = {
-  apiBaseUrl: envApiBaseUrl || 'http://localhost:5000',
+  apiBaseUrl: envApiBaseUrl || 'http://localhost:5001',
 };
 
 const ConfigContext = createContext(defaultConfig);

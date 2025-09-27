@@ -48,6 +48,7 @@ function inferFields(rows, columns) {
 //  analysisParams: { foName, tableName } 可选，如提供则展示“AI分析”模式
 //  onFoNameChange: (newFoName) => void  当后端 analyze_table 返回新的 fo 名称时回调父组件
 const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }) => {
+  const getApiUrl = useApiUrl();
   const [vizType, setVizType] = useState('table');
   const [catField, setCatField] = useState(null);
   const [numField, setNumField] = useState(null);
@@ -144,7 +145,7 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
       setAnalysisLoading(true);
       try {
         const qs = new URLSearchParams({ fo_name: currentFoName, table_name: analysisParams.tableName });
-        const resp = await fetch(`http://localhost:5000/api/analysis-results?${qs.toString()}`, { signal: controller.signal });
+        const resp = await fetch(getApiUrl(`/api/analysis-results?${qs.toString()}`), { signal: controller.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         const list = Array.isArray(data.results) ? data.results : [];
@@ -669,7 +670,7 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
                   bins: analysisTypeSel === 'histogram' ? (Number(analysisBins) || undefined) : undefined,
                   title: analysisTitle || undefined,
                 };
-                const resp = await fetch('http://localhost:5000/api/analyze-table', {
+                const resp = await fetch(getApiUrl('/api/analyze-table'), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(body),
