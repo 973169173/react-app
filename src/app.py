@@ -8,26 +8,13 @@ from werkzeug.utils import secure_filename
 import pandas as pd
 import time
 import uuid
-import sys
 
-# Archive handling utilities (separated logic)
-try:
-    from archive_utils import extract_zip_archive, ArchiveExtractionError
-except Exception as _arch_e:
-    extract_zip_archive = None  # Fallback if file missing
-    print(f"[WARN] archive_utils not available: {_arch_e}")
+from quest.backend.interface.persistence import init_task, snapshot, update_task,complete_task
+from quest.backend.interface.nl import NLImplementation
+import threading
+from flask import Response
 
-# 将 quest 项目加入 sys.path，便于直接导入后端实现
-QUEST_ROOT = '/data/guyang/quest'
-if QUEST_ROOT not in sys.path:
-    sys.path.append(QUEST_ROOT)
 
-try:
-    from quest.backend.interface.operation import OperationImplementation
-    _op_impl = OperationImplementation()
-except Exception as _e:
-    _op_impl = None
-    print(f"[WARN] Failed to init OperationImplementation: {_e}")
 
 app = Flask(__name__)
 CORS(app)
@@ -156,20 +143,316 @@ def filter():
     df=pd.DataFrame(data)
     return jsonify({    'table':df.to_dict(orient="split"),'function_name':"1111"})
 
-@app.route('/api/nl',methods=['POST'])
-def nl():
-    content,model=request.json.get('content'),request.json.get('model')
-    # 增加测试数据到至少 12 条；_source_age 保持列表形式以模拟多段来源
-    n = 12
-    data = {
-        'doc': [f'doc_{i:02d}.txt' for i in range(1, n+1)],
-        'age': [str(19 + i) for i in range(1, n+1)],
-        'name': [f'User {i}' for i in range(1, n+1)],
-        '_source_age': [[f'Age snippet A for User {i}', f'Age snippet B for User {i}'] for i in range(1, n+1)],
-        '_source_name': [f'Bio summary for User {i}' for i in range(1, n+1)],
-    }
-    df=pd.DataFrame(data)
-    return jsonify(df.to_dict(orient="split"))
+@app.route('/api/nl-parse', methods=['POST'])
+def nl_parse():
+    """第一步：解析自然语言，返回算子集合"""
+    try:
+        request_data = request.json or {}
+        query = request_data.get("query", "")
+        
+        if not query.strip():
+            return jsonify({'error': '查询不能为空'}), 400
+        
+        # 调用解析函数 - 这里先用模拟数据
+        # analysis_result = fun1.parse_nl(query)
+        
+        # 模拟数据 - 实际应该从 fun1.parse_nl 获取
+        analysis_result = {
+            'Extract': {
+                'age': {
+                    'description': 'the age of the player',
+                    'op': 'extract_age',
+                    'field_type': 'numeric',
+                    'required': True
+                },
+                'team': {
+                    'description': 'the team name of the player',
+                    'op': 'extract_team',
+                    'field_type': 'text',
+                    'required': True
+                },
+                'position': {
+                    'description': 'the playing position of the player',
+                    'op': 'extract_position',
+                    'field_type': 'text',
+                    'required': False
+                }
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'analysis_result': analysis_result,
+            'query': query
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'解析失败: {str(e)}'}), 500
+
+@app.route('/api/nl-plan', methods=['POST'])
+def nl_plan():
+    """第二步：基于分析结果生成执行计划"""
+    try:
+        request_data = request.json or {}
+        analysis_result = request_data.get("analysis_result", {})
+        
+        if not analysis_result:
+            return jsonify({'error': '缺少分析结果'}), 400
+        
+        # 调用计划生成函数 - 这里先用模拟数据
+        # plan_list = fun1.analysis_to_plan_list(analysis_result)
+        
+        # 模拟数据 - 实际应该从 fun1.analysis_to_plan_list 获取
+        plan_list = [
+            {
+                'id': 1,
+                'name': '提取玩家基本信息',
+                'description': '从文档中提取年龄、队伍和位置信息',
+                'steps': [
+                    'Extract age from player documents',
+                    'Extract team from player documents', 
+                    'Extract position from player documents'
+                ],
+                'estimated_time': '2-3 seconds',
+                'operators': ['Extract_age', 'Extract_team', 'Extract_position']
+            },
+            {
+                'id': 2,
+                'name': '高级信息检索',
+                'description': '使用语义检索获取更详细的玩家信息',
+                'steps': [
+                    'Semantic search for player details',
+                    'Filter by age and team criteria',
+                    'Retrieve additional player statistics'
+                ],
+                'estimated_time': '3-5 seconds',
+                'operators': ['SemanticRetrieval', 'Filter', 'Aggregate']
+            }
+        ]
+        
+        return jsonify({
+            'success': True,
+            'plan_list': plan_list,
+            'total_plans': len(plan_list)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'生成计划失败: {str(e)}'}), 500
+
+@app.route('/api/nl-execute', methods=['POST'])
+def nl_execute():
+    """第三步：执行选定的计划"""
+    try:
+        request_data = request.json or {}
+        analysis_result = request_data.get("analysis_result", {})
+        selected_plan = request_data.get("selected_plan", {})
+        
+        if not analysis_result or not selected_plan:
+            return jsonify({'error': '缺少必要参数'}), 400
+        
+        # 生成任务ID用于跟踪
+        task_id = str(int(time.time() * 1000))
+        
+        # 调用执行函数 - 这里先用模拟数据
+        # fo_name = fun1.solve_plan(task_id, analysis_result, selected_plan)
+        # result_data = fun1.show_origin_table()
+        
+        # 模拟数据 - 实际应该从 fun1.solve_plan 和 show_origin_table 获取
+        fo_name = f"execution_result_{task_id}"
+        result_data = {
+            "columns": ["player_name", "age", "team", "position"],
+            "data": [
+                ["Jay Fletcher Vincent", 28, "Lakers", "Point Guard"],
+                ["Michael Jordan", 35, "Bulls", "Shooting Guard"],
+                ["LeBron James", 39, "Lakers", "Small Forward"]
+            ],
+            "index": [0, 1, 2],
+            "doc": ["Jay_Fletcher_Vincent.txt", "Michael_Jordan.txt", "LeBron_James.txt"]
+        }
+        
+        return jsonify({
+            'success': True,
+            'fo_name': fo_name,
+            'result_data': result_data,
+            'task_id': task_id,
+            'executed_plan': selected_plan
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'执行失败: {str(e)}'}), 500
+
+@app.route('/api/nl-start', methods=['POST'])
+def nl_start():
+    """启动自然语言查询任务"""
+    try:
+        request_data = request.json or {}
+        query = request_data.get("query", "")
+        index = request_data.get("index", [])
+        desc = request_data.get("desc", {})
+        model = request_data.get("model", "gpt-4o")
+        
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+        
+        # 初始化任务描述
+        first_desc = f"{query[:50]}..."
+        init_task(task_id, first_desc)
+        
+        # # 启动后台任务（串行执行）
+        # def execute_nl_pipeline():
+        #     try:
+        #         # 第一步：解析自然语言，获得分析结果
+        #         analysis_result = fun1.parse_nl(task_id, query)
+                
+        #         # 第二步：基于分析结果生成执行计划
+        #         plan_list = fun1.analysis_to_plan_list(analysis_result)
+                
+        #         # 第三步：执行第一个计划（通常取第一个计划）
+        #         if plan_list and len(plan_list) > 0:
+        #             first_plan = plan_list[0]
+        #             final_result = fun1.solve_plan(task_id, analysis_result, first_plan)
+                    
+        #         else:
+        #             update_task(task_id, "No execution plan generated")
+        #             return None
+        #         complete_task(task_id, fun1.show_origin_table())    
+        #         return True
+        #     except Exception as e:
+        #         update_task(task_id, f"Pipeline execution failed: {str(e)}")
+        #         return None
+        
+        threading.Thread(target=fun1.parse_nl,args=(task_id), daemon=True).start()
+
+        
+
+        return jsonify({"task_id": task_id})
+        
+    except Exception as e:
+        return jsonify({'error': f'启动任务失败: {str(e)}'}), 500
+
+@app.route('/api/nl-events/<task_id>', methods=['GET'])
+def nl_events(task_id):
+    """获取任务进度的SSE流"""
+    def stream():
+        last = None
+        heartbeat_at = time.time()
+        while True:
+            snap = snapshot(task_id)
+            if not snap:
+                yield 'event: error\ndata: {"message":"task not found"}\n\n'
+                break
+
+            # 检查是否有结果数据
+            result_data = snap.get('result')
+            if result_data:
+                # 发送完成事件
+                final_result = {
+                    "type": "result",
+                    "data": result_data,
+                    "task_info": {
+                        "task_id": snap["task_id"],
+                        "started_at": snap["started_at"],
+                        "updated_at": snap["updated_at"],
+                        "description": snap["description"]
+                    }
+                }
+                yield "event: result\n"
+                yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
+                break
+
+            # 发送进度更新
+            payload = json.dumps(snap, ensure_ascii=False)
+            if payload != last:
+                last = payload
+                yield "event: progress\n"
+                yield f"data: {payload}\n\n"
+
+            # 心跳，避免代理断开
+            if time.time() - heartbeat_at > 10:
+                yield ": keep-alive\n\n"
+                heartbeat_at = time.time()
+
+            time.sleep(0.3)
+
+    return Response(stream(), headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control"
+    })
+
+@app.route('/api/nl-stream', methods=['GET'])
+def nl_stream():
+    """SSE流式处理自然语言查询"""
+    try:
+        # 从查询参数获取数据
+        data_param = request.args.get('data')
+        if not data_param:
+            return jsonify({'error': 'Missing data parameter'}), 400
+        
+        import json
+        request_data = json.loads(data_param)
+        table = request_data.get("index")
+        query = request_data.get("query")
+        desc = request_data.get("desc")
+        model = request_data.get("model", "gpt-4o")
+        
+        print(f"SSE Request - table: {table}, query: {query}, desc: {desc}, model: {model}")
+        
+        def generate():
+            """生成SSE数据流"""
+            try:
+                # 发送开始状态
+                yield f"data: {json.dumps({'type': 'status', 'message': '开始处理请求...'})}\n\n"
+                time.sleep(5)
+                # 发送分析文档状态
+                yield f"data: {json.dumps({'type': 'status', 'message': '正在分析文档...'})}\n\n"
+                time.sleep(5)
+                # 发送查询索引状态
+                yield f"data: {json.dumps({'type': 'status', 'message': '正在查询索引...'})}\n\n"
+                time.sleep(5)
+                # 发送生成回答状态
+                yield f"data: {json.dumps({'type': 'status', 'message': '正在生成回答...'})}\n\n"
+                time.sleep(5)
+                # 实际处理数据
+                data={
+                    'doc':['Aaron_Williams.txt','1111111','222222222'],
+                    'age':['30','12','212'],
+                    'name':['Aaron Williams','121','121'],
+                    '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
+                    '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+                }
+                df=pd.DataFrame(data)
+                result_data = df.to_dict(orient="split")
+                time.sleep(5)
+                # 发送处理完成状态
+                yield f"data: {json.dumps({'type': 'status', 'message': '处理完成！'})}\n\n"
+                time.sleep(5)
+                # 发送最终结果
+                yield f"data: {json.dumps({'type': 'result', 'data': result_data})}\n\n"
+                
+            except Exception as e:
+                # 发送错误状态
+                error_msg = f"处理失败: {str(e)}"
+                yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+        
+        # 返回SSE响应
+        response = Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': f'SSE处理失败: {str(e)}'}), 500
 
 
 @app.route('/api/sql', methods=['POST'])

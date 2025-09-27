@@ -12,10 +12,12 @@ import {
   FolderOpenOutlined,
   PlusOutlined
 } from '@ant-design/icons';
+import { useApiUrl } from '../configContext';
 
 const { Text, Paragraph } = Typography;
 
 const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumentsSet, onDocumentPreview }) => {
+  const getApiUrl = useApiUrl();
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewDocument, setPreviewDocument] = useState(null);
   const [expandedDocIds, setExpandedDocIds] = useState([]);
@@ -40,7 +42,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   useEffect(() => {
     const loadDocuments = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/documents');
+  const response = await fetch(getApiUrl('/api/documents'));
         if (response.ok) {
           const serverDocuments = await response.json();
           // 直接设置文档列表，而不是逐个添加
@@ -98,7 +100,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     if (document.type.includes('pdf') || document.name.toLowerCase().endsWith('.pdf')) {
       // 对于PDF文件，从服务器下载并打开
       try {
-        const response = await fetch(`http://localhost:5000/api/documents/${document.filename}/download`);
+  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
         if (response.ok) {
           const blob = await response.blob();
           const fileURL = URL.createObjectURL(blob);
@@ -132,7 +134,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+  const response = await fetch(getApiUrl('/api/upload'), {
         method: 'POST',
         body: formData,
       });
@@ -179,7 +181,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+  const response = await fetch(getApiUrl('/api/upload'), {
         method: 'POST',
         body: formData,
       });
@@ -212,7 +214,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
   const handleDeleteDocument = async (doc) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/documents/${doc.filename}`, {
+  const response = await fetch(getApiUrl(`/api/documents/${doc.filename}`), {
         method: 'DELETE',
       });
 
@@ -232,7 +234,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
   const handleDownload = async (document) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/documents/${document.filename}/download`);
+  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -546,7 +548,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
 
     try {
       setBuildingIndex(true);
-      const response = await fetch('http://localhost:5000/api/build-index', {
+  const response = await fetch(getApiUrl('/api/build-index'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -42,6 +42,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useApiUrl } from '../configContext';
 
 
 const { Option } = Select;
@@ -644,6 +645,7 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
 // - showBackButton/onBackToProjects: 顶部返回按钮控制
 // - projectInfo: 当前项目元信息（含 function_name / name 等）
 const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackToProjects, projectInfo }) => {
+  const getApiUrl = useApiUrl();
   const { message } = App.useApp();
   
   // 添加视图模式状态
@@ -690,7 +692,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   const fetchIndexes = useCallback(async () => {
     setLoadingIndexes(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/existindex?function_name=${projectInfo?.function_name}`);
+  const response = await fetch(getApiUrl(`/api/existindex?function_name=${projectInfo?.function_name}`));
       if (!response.ok) {
         throw new Error('Failed to fetch indexes');
       }
@@ -781,7 +783,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     if (!projectInfo?.id || !functionName) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/projects/${projectInfo.id}`, {
+  const response = await fetch(getApiUrl(`/api/projects/${projectInfo.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -848,7 +850,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       });
 
       if (operator.type === 'Extract') {
-        response = await fetch('http://localhost:5000/api/extract', {
+  response = await fetch(getApiUrl('/api/extract'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -864,7 +866,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         });
       }
       else if (operator.type ==='Filter') {
-        response = await fetch('http://localhost:5000/api/filter', {
+  response = await fetch(getApiUrl('/api/filter'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -880,7 +882,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         });
       }
       else if (operator.type ==='Retrieve') {
-        response = await fetch('http://localhost:5000/api/retrieve', {
+  response = await fetch(getApiUrl('/api/retrieve'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -965,7 +967,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         return index ? index.name : id;
       });
 
-      const response = await fetch('http://localhost:5000/api/save-index-selection', {
+  const response = await fetch(getApiUrl('/api/save-index-selection'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1001,7 +1003,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         operators
       };
       
-      const response = await fetch('http://localhost:5000/api/save-workflow', {
+  const response = await fetch(getApiUrl('/api/save-workflow'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1072,7 +1074,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       }
       
       if (operator.type === 'Extract') {
-        response = await fetch('http://localhost:5000/api/extract', {
+  response = await fetch(getApiUrl('/api/extract'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1087,7 +1089,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         });
       }
       else if (operator.type ==='Filter') {
-        response = await fetch('http://localhost:5000/api/filter', {
+  response = await fetch(getApiUrl('/api/filter'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1125,7 +1127,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     if (!functionName) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/project-data/${functionName}`);
+  const response = await fetch(getApiUrl(`/api/project-data/${functionName}`));
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

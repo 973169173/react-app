@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {Button, Input, Select, Space, Typography,  Avatar, Tag, Table, Collapse, Modal, List, App, Badge, Divider } from 'antd';
+import {Button, Input, Select, Space, Typography,  Avatar, Tag, Table, Collapse, Modal, List, App, Badge, Divider, Card, Steps, Checkbox, Radio } from 'antd';
 import { 
   SendOutlined,
   SaveOutlined,
@@ -11,6 +11,7 @@ import {
   SettingOutlined
 
 } from '@ant-design/icons';
+import { useApiUrl } from '../configContext';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -145,7 +146,91 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
   );
 };
 
+// 可编辑的解析结果项组件
+const EditableParseItem = ({ originalKey, info, onEdit, onDelete }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [key, setKey] = useState(originalKey);
+  const [description, setDescription] = useState(info.description || '');
+
+  const handleSave = () => {
+    if (key.trim()) {
+      onEdit(originalKey, key.trim(), description);
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setKey(originalKey);
+    setDescription(info.description || '');
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    onDelete(originalKey);
+  };
+
+  if (isEditing) {
+    return (
+      <Card size="small" style={{ marginBottom: 8 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <div>
+            <Text strong style={{ marginBottom: 4, display: 'block' }}>Key:</Text>
+            <Input
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="Enter field key"
+            />
+          </div>
+          <div>
+            <Text strong style={{ marginBottom: 4, display: 'block' }}>Description:</Text>
+            <TextArea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter field description"
+              rows={2}
+            />
+          </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <Space>
+              <Button size="small" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button size="small" type="primary" onClick={handleSave}>
+                Save
+              </Button>
+            </Space>
+          </div>
+        </Space>
+      </Card>
+    );
+  }
+
+  return (
+    <Card size="small" style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <Text strong>{key}</Text>
+          <br />
+          <Text type="secondary">{description}</Text>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Space>
+            <Button size="small" onClick={() => setIsEditing(true)}>
+              Edit
+            </Button>
+            <Button size="small" danger onClick={handleDelete}>
+              Delete
+            </Button>
+          </Space>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
+  const getApiUrl = useApiUrl();
   const { message } = App.useApp();
   
   const [query, setQuery] = useState('what the age and team of Jay Fletcher Vincent?');
@@ -158,7 +243,8 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   
   // SSE 相关状态
   const [processingStatus, setProcessingStatus] = useState('');
-  const [sseConnection, setSseConnection] = useState(null);
+  const [sseConnections, setSseConnections] = useState({}); // 管理多个SSE连接
+  const [activeTasks, setActiveTasks] = useState({}); // 跟踪活跃任务
   
   // 索引相关状态
   const [indexConfigVisible, setIndexConfigVisible] = useState(false);
@@ -166,6 +252,14 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const [availableIndexes, setAvailableIndexes] = useState([]);
   const [loadingIndexes, setLoadingIndexes] = useState(false);
   const [indexDescriptions, setIndexDescriptions] = useState(); // 默认描述
+  
+  // 分步流程状态
+  const [currentStep, setCurrentStep] = useState(null); // 'parse', 'plan', 'execute', null
+  const [currentQuery, setCurrentQuery] = useState(''); // 当前正在处理的查询
+  const [parseResult, setParseResult] = useState(null); // parse阶段结果
+  const [editableParseResult, setEditableParseResult] = useState(null); // 可编辑的parse结果
+  const [planList, setPlanList] = useState([]); // plan阶段结果
+  const [selectedPlan, setSelectedPlan] = useState(null); // 选中的执行计划
   
   const conversationEndRef = useRef(null);
   const [conversations, setConversations] = useState([
@@ -197,7 +291,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const fetchIndexes = async () => {
     setLoadingIndexes(true);
     try {
-      const response = await fetch('http://localhost:5000/api/indexes');
+    const response = await fetch(getApiUrl('/api/indexes'));
       if (!response.ok) {
         throw new Error("HTTP error!");
       }
@@ -217,14 +311,16 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
     fetchIndexes();
   }, []);
 
-  // 组件卸载时关闭SSE连接
+  // 组件卸载时关闭所有SSE连接
   useEffect(() => {
     return () => {
-      if (sseConnection) {
-        sseConnection.close();
-      }
+      Object.values(sseConnections).forEach(connection => {
+        if (connection) {
+          connection.close();
+        }
+      });
     };
-  }, [sseConnection]);
+  }, [sseConnections]);
 
 
   const handleSendMessage = async () => {
@@ -233,121 +329,379 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       return;
     }
 
-    if (selectedIndexes.length === 0) {
-      message.warning('Please select at least one index.');
-      return;
-    }
 
+
+    // 保存当前查询，避免状态更新时序问题
+    const currentQueryText = query.trim();
+
+    // 添加用户消息到对话记录
     const userMessage = {
       id: Date.now(),
       type: 'user',
-      content: query,
+      content: currentQueryText,
       timestamp: new Date().toLocaleTimeString()
     };
 
     setConversations(prev => [...prev, userMessage]);
-    setIsProcessing(true);
-    setProcessingStatus('开始处理请求...');
+    setCurrentQuery(currentQueryText);
     setQuery('');
+    setIsProcessing(true);
+    
+    // 开始第一步：解析自然语言
+    await startParseStep(currentQueryText);
+  };
 
+  const startParseStep = async (queryText) => {
     try {
-      // 关闭之前的SSE连接
-      if (sseConnection) {
-        sseConnection.close();
-      }
+      setCurrentStep('parse');
+      setProcessingStatus('Starting parse task...');
 
       // 第一步：启动任务
-      const requestData = {
-        index: selectedIndexes,
-        query: query,
-        desc: indexDescriptions,
-        model: model
-      };
-
-      console.log('Starting task with data:', requestData);
-
-      // POST请求启动任务
-      const response = await fetch('http://localhost:5000/api/nl-start', {
+      const startResponse = await fetch('http://localhost:5000/api/nl-parse-start', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          query: queryText || currentQuery,
+          index: selectedIndexes,
+          desc: indexDescriptions 
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!startResponse.ok) {
+        throw new Error(`Parse start failed: ${startResponse.status}`);
       }
 
-      const { task_id } = await response.json();
-      console.log('Task started with ID:', task_id);
+      const { task_id } = await startResponse.json();
+      
+      // 第二步：监听进度事件
+      const eventSource = new EventSource(`http://localhost:5000/api/nl-parse-events/${task_id}`);
+      
+      // 保存连接引用
+      setSseConnections(prev => ({ ...prev, parse: eventSource }));
+      setActiveTasks(prev => ({ ...prev, parse: task_id }));
+      
+      setProcessingStatus('Parsing natural language query...');
 
-      // 第二步：建立SSE连接监听进度
-      const eventSource = new EventSource(`http://localhost:5000/api/nl-events/${task_id}`);
-      setSseConnection(eventSource);
-
-      // 监听进度事件
       eventSource.addEventListener('progress', (event) => {
-        try {
-          const taskInfo = JSON.parse(event.data);
-          // 更新处理状态
-          setProcessingStatus(taskInfo.description || '处理中...');
-        } catch (parseError) {
-          console.error('解析进度数据失败:', parseError);
-          setProcessingStatus('数据解析错误...');
+        const snap = JSON.parse(event.data);
+        setProcessingStatus(snap.description || 'Parsing...');
+        
+        // 如果有日志更新，可以显示
+        if (snap.logs && snap.logs.length > 0) {
+          console.log('Parse logs:', snap.logs);
         }
       });
 
-      // 监听结果事件
-      eventSource.addEventListener('result', (event) => {
-        try {
-          const resultData = JSON.parse(event.data);
-          
-          // 处理最终结果
-          const assistantMessage = {
-            id: Date.now() + 1,
-            type: 'assistant',
-            content: 'Based on the analysis of the document you provided, I have obtained the following information:',
-            output: JSON.stringify(resultData.data),
-            timestamp: new Date().toLocaleTimeString(),
-            relatedDocs: resultData.data?.doc || []
-          };
-          
-          setConversations(prev => [...prev, assistantMessage]);
+      eventSource.addEventListener('complete', (event) => {
+        const snap = JSON.parse(event.data);
+        console.log('Parse complete:', snap.result);
+        if (snap.result) {
+          setParseResult(snap.result);
+          setEditableParseResult(JSON.parse(JSON.stringify(snap.result)));
           setIsProcessing(false);
           setProcessingStatus('');
-          eventSource.close();
-          setSseConnection(null);
-        } catch (parseError) {
-          console.error('解析结果数据失败:', parseError);
-          setProcessingStatus('结果解析错误...');
+        } else {
+          throw new Error('Parse completed but no result received');
         }
+        
+        // 关闭连接
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, parse: null }));
+        setActiveTasks(prev => ({ ...prev, parse: null }));
       });
 
-      // 监听错误事件
       eventSource.addEventListener('error', (event) => {
-        try {
-          const errorData = JSON.parse(event.data);
-          throw new Error(errorData.message || '任务处理失败');
-        } catch (parseError) {
-          throw new Error('任务处理失败');
-        }
-      });
-
-      eventSource.onerror = (error) => {
-        console.error('SSE连接错误:', error);
+        console.error('Parse SSE error:', event);
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, parse: null }));
+        setActiveTasks(prev => ({ ...prev, parse: null }));
+        
         setIsProcessing(false);
         setProcessingStatus('');
-        message.error('连接失败，请检查网络或服务器状态');
-        eventSource.close();
-        setSseConnection(null);
-      };
+        setCurrentStep(null);
+        setEditableParseResult(null);
+        message.error('Parse failed: SSE connection error');
+      });
 
     } catch (error) {
-      console.error('处理失败:', error);
+      console.error('Parse step failed:', error);
       setIsProcessing(false);
       setProcessingStatus('');
-      message.error('处理失败: ' + error.message);
+      setCurrentStep(null);
+      setEditableParseResult(null);
+      message.error('Parse failed: ' + error.message);
+    }
+  };
+
+  const startPlanStep = async (modifiedParseResult) => {
+    try {
+      setIsProcessing(true);
+      setCurrentStep('plan');
+      setProcessingStatus('Starting plan generation task...');
+
+      // 将修改后的parse结果转换为对话记录
+      const parseMessage = {
+        id: Date.now(),
+        type: 'assistant',
+        content: 'I have analyzed your query and identified the following operators:',
+        parseResult: modifiedParseResult,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setConversations(prev => [...prev, parseMessage]);
+      console.log('Starting plan step with parse result:', modifiedParseResult);
+      // 第一步：启动任务
+  const startResponse = await fetch(getApiUrl('/api/nl-plan-start'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis_result: modifiedParseResult })
+      });
+
+      if (!startResponse.ok) {
+        throw new Error(`Plan start failed: ${startResponse.status}`);
+      }
+
+      const { task_id } = await startResponse.json();
+      
+      // 第二步：监听进度事件
+  const eventSource = new EventSource(getApiUrl(`/api/nl-plan-events/${task_id}`));
+      
+      // 保存连接引用
+      setSseConnections(prev => ({ ...prev, plan: eventSource }));
+      setActiveTasks(prev => ({ ...prev, plan: task_id }));
+      
+      setProcessingStatus('Generating execution plans...');
+
+      eventSource.addEventListener('progress', (event) => {
+        const snap = JSON.parse(event.data);
+        setProcessingStatus(snap.description || 'Generating plans...');
+        
+        if (snap.logs && snap.logs.length > 0) {
+          console.log('Plan logs:', snap.logs);
+        }
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        const snap = JSON.parse(event.data);
+        console.log('Plan complete event:', snap);
+        
+        if (snap.result && snap.result.plan_list) {
+          setPlanList(snap.result.plan_list);
+          setIsProcessing(false);
+          setProcessingStatus('');
+        } else if (snap.result && Array.isArray(snap.result)) {
+          // 如果直接返回数组
+          setPlanList(snap.result);
+          setIsProcessing(false);
+          setProcessingStatus('');
+        } else {
+          console.error('Plan completed but no valid result received:', snap);
+          throw new Error('Plan completed but no result received');
+        }
+        
+        // 关闭连接
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, plan: null }));
+        setActiveTasks(prev => ({ ...prev, plan: null }));
+      });
+
+      eventSource.addEventListener('error', (event) => {
+        console.error('Plan SSE error:', event);
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, plan: null }));
+        setActiveTasks(prev => ({ ...prev, plan: null }));
+        
+        setIsProcessing(false);
+        setProcessingStatus('');
+        setCurrentStep(null);
+        setEditableParseResult(null);
+        message.error('Plan generation failed: SSE connection error');
+      });
+
+    } catch (error) {
+      console.error('Plan step failed:', error);
+      setIsProcessing(false);
+      setProcessingStatus('');
+      setCurrentStep(null);
+      setEditableParseResult(null);
+      message.error('Plan generation failed: ' + error.message);
+    }
+  };
+
+  // 处理解析结果编辑
+  const handleEditParseResult = (oldKey, newKey, newDescription) => {
+    setEditableParseResult(prev => {
+      const newResult = { ...prev };
+      if (!newResult.Extract) newResult.Extract = {};
+      
+      // 如果key发生变化，需要保持原有顺序
+      if (oldKey !== newKey && newResult.Extract[oldKey]) {
+        // 创建一个新的对象来保持顺序
+        const newExtract = {};
+        
+        // 遍历原对象，替换对应的key
+        Object.entries(newResult.Extract).forEach(([key, value]) => {
+          if (key === oldKey) {
+            // 用新key替换旧key，但保持位置不变
+            newExtract[newKey] = {
+              description: newDescription,
+              required: true,
+              field_type: value.field_type || 'string'
+            };
+          } else {
+            newExtract[key] = value;
+          }
+        });
+        
+        newResult.Extract = newExtract;
+      } else {
+        // 如果key没有变化，只更新描述
+        newResult.Extract[newKey] = {
+          description: newDescription,
+          required: true, // 既然保留的都是需要的，默认设为true
+          field_type: prev.Extract?.[oldKey]?.field_type || 'string'
+        };
+      }
+      
+      return newResult;
+    });
+  };
+
+  // 删除解析结果条目
+  const handleDeleteParseItem = (key) => {
+    setEditableParseResult(prev => {
+      const newResult = { ...prev };
+      if (newResult.Extract && newResult.Extract[key]) {
+        delete newResult.Extract[key];
+      }
+      return newResult;
+    });
+  };
+
+  // 保存编辑后的解析结果
+  const handleSaveEditedParseResult = () => {
+    if (!editableParseResult) return;
+    
+    // 直接使用编辑后的结果，用户已经通过Delete按钮删除了不需要的条目
+    setParseResult(editableParseResult);
+    startPlanStep(editableParseResult);
+  };
+
+  const startExecuteStep = async (selectedPlan) => {
+    try {
+      setIsProcessing(true);
+      setCurrentStep('execute');
+      setProcessingStatus('Starting execution task...');
+
+      // 将选择的计划转换为对话记录
+      const planMessage = {
+        id: Date.now(),
+        type: 'assistant',
+        content: `I will execute the selected plan with ${Array.isArray(selectedPlan) ? selectedPlan.length : 0} steps`,
+        selectedPlan: selectedPlan,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setConversations(prev => [...prev, planMessage]);
+
+      // 第一步：启动任务
+      const startResponse = await fetch('http://localhost:5000/api/nl-execute-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          analysis_result: parseResult,
+          selected_plan: selectedPlan 
+        })
+      });
+
+      if (!startResponse.ok) {
+        throw new Error(`Execution start failed: ${startResponse.status}`);
+      }
+
+      const { task_id } = await startResponse.json();
+      
+      // 第二步：监听进度事件
+      const eventSource = new EventSource(`http://localhost:5000/api/nl-execute-events/${task_id}`);
+      
+      // 保存连接引用
+      setSseConnections(prev => ({ ...prev, execute: eventSource }));
+      setActiveTasks(prev => ({ ...prev, execute: task_id }));
+      
+      setProcessingStatus('Executing selected plan...');
+
+      eventSource.addEventListener('progress', (event) => {
+        const snap = JSON.parse(event.data);
+        setProcessingStatus(snap.description || 'Executing...');
+        
+        if (snap.logs && snap.logs.length > 0) {
+          console.log('Execute logs:', snap.logs);
+        }
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        const snap = JSON.parse(event.data);
+        console.log('Execute complete event:', snap);
+        
+        if (snap.result ) {
+          // 处理执行结果数据
+          let outputData = snap.result;
+          let relatedDocs = [];
+          
+          // 如果结果包含 result_data，使用它
+          if (snap.result.result_data) {
+            outputData = snap.result.result_data;
+            relatedDocs = snap.result.result_data.doc || [];
+          }
+          
+          // 添加执行结果到对话记录
+          const resultMessage = {
+            id: Date.now() + 1,
+            type: 'assistant',
+            content: 'Here are the results from executing your query:',
+            output: JSON.stringify(outputData),
+            timestamp: new Date().toLocaleTimeString(),
+            relatedDocs: relatedDocs
+          };
+          
+          setConversations(prev => [...prev, resultMessage]);
+          
+          // 重置所有状态，准备下一个查询
+          setCurrentStep(null);
+          setCurrentQuery('');
+          setParseResult(null);
+          setEditableParseResult(null);
+          setPlanList([]);
+          setSelectedPlan(null);
+          setIsProcessing(false);
+          setProcessingStatus('');
+        } else {
+          throw new Error('Execution completed but no result received');
+        }
+        
+        // 关闭连接
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, execute: null }));
+        setActiveTasks(prev => ({ ...prev, execute: null }));
+      });
+
+      eventSource.addEventListener('error', (event) => {
+        console.error('Execute SSE error:', event);
+        eventSource.close();
+        setSseConnections(prev => ({ ...prev, execute: null }));
+        setActiveTasks(prev => ({ ...prev, execute: null }));
+        
+        setIsProcessing(false);
+        setProcessingStatus('');
+        setCurrentStep(null);
+        setEditableParseResult(null);
+        message.error('Execution failed: SSE connection error');
+      });
+
+    } catch (error) {
+      console.error('Execute step failed:', error);
+      setIsProcessing(false);
+      setProcessingStatus('');
+      setCurrentStep(null);
+      setEditableParseResult(null);
+      message.error('Execution failed: ' + error.message);
     }
   };
 
@@ -362,10 +716,19 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   };
 
   // 保存索引配置
-  const handleSaveIndexConfig = (selectedIndexIds, descriptions) => {
+  const handleSaveIndexConfig = async(selectedIndexIds, descriptions) => {
     setSelectedIndexes(selectedIndexIds);
     setIndexDescriptions(descriptions);
     setIndexConfigVisible(false);
+    const response = await fetch(getApiUrl('/api/save-nl-index'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        selected_indexes: selectedIndexIds
+      })
+    });
     message.success(`indexes saved successfully (${selectedIndexIds.length} indexes)`);
   };
 
@@ -396,7 +759,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         timestamp: new Date().toLocaleString("sv-SE").replace(" ", "T")
       };
       
-      const response = await fetch('http://localhost:5000/api/save-conversation', {
+  const response = await fetch(getApiUrl('/api/save-conversation'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -425,7 +788,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   const fetchSavedConversations = async () => {
     try {
       setLoadingConversations(true);
-      const response = await fetch('http://localhost:5000/api/conversations');
+  const response = await fetch(getApiUrl('/api/conversations'));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -444,7 +807,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   // 加载指定的对话记录
   const loadConversation = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${filename}`);
+  const response = await fetch(getApiUrl(`/api/conversations/${filename}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -471,7 +834,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   // 删除对话记录
   const deleteConversation = async (filename) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${filename}`, {
+  const response = await fetch(getApiUrl(`/api/conversations/${filename}`), {
         method: 'DELETE'
       });
       
@@ -605,6 +968,60 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                     </Text>
                   </div>
                   
+                  {/* Parse结果显示 */}
+                  {item.type === 'assistant' && item.parseResult && (
+                    <Collapse size="small" style={{ marginTop: 8 }}>
+                      <Panel header="Parse Results" key="parseResult">
+                        <div>
+                          {Object.entries(item.parseResult.Extract || {}).map(([key, info]) => (
+                            <Card key={key} size="small" style={{ marginBottom: 8 }}>
+                              <div>
+                                <Text strong>{key}</Text>: <Text>{info.description}</Text>
+                                <br />
+                                <Text type="secondary">
+                                  Type: {info.field_type}, Required: {info.required ? 'Yes' : 'No'}
+                                </Text>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </Panel>
+                    </Collapse>
+                  )}
+
+                  {/* 选中的执行计划显示 */}
+                  {item.type === 'assistant' && item.selectedPlan && (
+                    <Collapse size="small" style={{ marginTop: 8 }}>
+                      <Panel header="Selected Execution Plan" key="selectedPlan">
+                        <Card size="small">
+                          <div>
+                            <Text strong>Selected Plan</Text>
+                            <div style={{ marginTop: 8 }}>
+                              <Text type="secondary">Steps:</Text>
+                              {Array.isArray(item.selectedPlan) ? (
+                                <div style={{ marginTop: 4 }}>
+                                  {item.selectedPlan.map((step, index) => (
+                                    <div key={index} style={{ marginBottom: 6, paddingLeft: 12 }}>
+                                      <Text strong style={{ fontSize: '13px' }}>{step.name}:</Text>
+                                      <br />
+                                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                                        {step.description}
+                                      </Text>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ marginTop: 4 }}>
+                                  <Text type="secondary">No steps available</Text>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      </Panel>
+                    </Collapse>
+                  )}
+
                   {/* AI助手的表格输出 */}
                   {item.type === 'assistant' && item.output && (
                     <Collapse size="small" style={{ marginTop: 8 }}>
@@ -710,6 +1127,96 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
             </div>
           ))}
           
+          {/* 步骤显示区域 */}
+          {currentStep && (
+            <div style={{ 
+              padding: '16px',
+              border: '1px solid #f0f0f0',
+              borderRadius: '8px',
+              backgroundColor: '#f6ffed',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <Avatar 
+                  icon={<RobotOutlined />}
+                  style={{ backgroundColor: '#52c41a', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Parse 阶段显示 */}
+                  {currentStep === 'parse' && editableParseResult && (
+                    <div>
+                      <Text strong>Parse Results - Please review and modify if needed:</Text>
+                      <div style={{ marginTop: 12 }}>
+                        {Object.entries(editableParseResult.Extract || {}).map(([key, info]) => (
+                          <EditableParseItem
+                            key={key}
+                            originalKey={key}
+                            info={info}
+                            onEdit={handleEditParseResult}
+                            onDelete={handleDeleteParseItem}
+                          />
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 16, textAlign: 'right' }}>
+                        <Button 
+                          type="primary" 
+                          onClick={handleSaveEditedParseResult}
+                        >
+                          Continue to Plan Generation
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Plan 阶段显示 */}
+                  {currentStep === 'plan' && planList.length > 0 && (
+                    <div>
+                      <Text strong>Available Execution Plans - Please select one:</Text>
+                      <div style={{ marginTop: 12 }}>
+                        <Radio.Group 
+                          onChange={(e) => setSelectedPlan(planList[parseInt(e.target.value)])}
+                          value={selectedPlan ? planList.indexOf(selectedPlan) : undefined}
+                        >
+                          <Space direction="vertical" style={{ width: '100%' }}>
+                            {planList.map((plan, planIndex) => (
+                              <Radio key={planIndex} value={planIndex}>
+                                <Card size="small" style={{ marginLeft: 8, width: 'calc(100% - 24px)' }}>
+                                  <div>
+                                    <Text strong>Plan {planIndex + 1}</Text>
+                                    <div style={{ marginTop: 8 }}>
+                                      {Array.isArray(plan) && plan.map((step, stepIndex) => (
+                                        <div key={stepIndex} style={{ marginBottom: 8, paddingLeft: 16 }}>
+                                          <Text strong style={{ fontSize: '13px' }}>{step.name}:</Text>
+                                          <br />
+                                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                                            {step.description}
+                                          </Text>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </Card>
+                              </Radio>
+                            ))}
+                          </Space>
+                        </Radio.Group>
+                      </div>
+                      <div style={{ marginTop: 16, textAlign: 'right' }}>
+                        <Button 
+                          type="primary" 
+                          disabled={selectedPlan === null || selectedPlan === undefined}
+                          onClick={() => startExecuteStep(selectedPlan)}
+                        >
+                          Execute Selected Plan
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {isProcessing && (
             <div style={{ 
               textAlign: 'center', 
@@ -759,9 +1266,9 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
                 icon={<SendOutlined />}
                 onClick={handleSendMessage}
                 loading={isProcessing}
-                disabled={!query.trim() || selectedIndexes.length === 0}
+                disabled={!query.trim()  }
               >
-                Send Message
+                {currentStep ? 'Processing...' : 'Send Message'}
               </Button>
             </div>
           </Space>

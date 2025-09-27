@@ -4,6 +4,7 @@ import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { ExportOutlined, BarChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import './ResultViewer.css';
+import { useApiUrl } from '../configContext';
 
 const { Text } = Typography;
 
