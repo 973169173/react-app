@@ -184,24 +184,20 @@ def nl_execute():
         init_task(task_id, first_desc)
         
         def execute():
-            try:
-                update_task(task_id, "Starting execution...")
-                print("Calling solve_plan with:", analysis_result, selected_plan)
-                foname = fun1.solve_plan(task_id,analysis_result, selected_plan)
-                print("Got foname:", foname)
-                
-                update_task(task_id, "Getting results...")
-                result_data = fun1.show_table_with_source()
-                print("Got result_data:", result_data)
-                
-                update_task(task_id, "Execution completed")
-                complete_task(task_id, result_data)
-            except Exception as e:
-                print(f"Execution error: {e}")
-                import traceback
-                traceback.print_exc()
-                update_task(task_id, f"Execution failed: {str(e)}")
-                return
+
+            update_task(task_id, "Starting execution...")
+            print("Calling solve_plan with:", analysis_result, selected_plan)
+            foname = fun1.solve_plan(task_id,analysis_result, selected_plan)
+            print("Got foname:", foname)
+            
+            update_task(task_id, "Getting results...")
+            result_data = fun1.show_table_with_source()
+            print("Got result_data:", result_data)
+            
+            update_task(task_id, "Execution completed")
+            complete_task(task_id, result_data)
+
+
         
         threading.Thread(target=execute, daemon=True).start()
 
