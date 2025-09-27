@@ -1,7 +1,7 @@
 import sys
-#sys.path.append('/home/yuxinjiang/quest')  # 添加 quest 的父目录到 sys.path
+sys.path.append('/home/yuxinjiang/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/data/guyang/quest')  # 将内层 quest 设为包根
-sys.path.append('/home/lijianhui/workspace/quest')  # 添加 quest 的父目录到 sys.path
+#sys.path.append('/home/lijianhui/workspace/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/home/lijianhui/workspace/quest/quest')  # 将内层 quest 设为包根
 
 
@@ -201,6 +201,7 @@ def nl_execute():
                 import traceback
                 traceback.print_exc()
                 update_task(task_id, f"Execution failed: {str(e)}")
+                return
         
         threading.Thread(target=execute, daemon=True).start()
 
@@ -333,12 +334,13 @@ def nl_excute_events(task_id):
                 break
 
             # 检查是否有结果数据
-            result_data = snap.get('result')
-            if not result_data.empty:
+            result_data = snap.get('result',"")
+            if isinstance(result_data,pd.DataFrame):
                 # 发送完成事件
+                table=result_data.to_dict(orient="split")
                 final_result = {
                     "type": "result",
-                    "result": result_data,
+                    "result": table,
                     "task_info": {
                         "task_id": snap["task_id"],
                         "started_at": snap["started_at"],
@@ -346,6 +348,7 @@ def nl_excute_events(task_id):
                         "description": snap["description"]
                     }
                 }
+                
                 yield "event: complete\n"
                 yield f"data: {json.dumps(final_result, ensure_ascii=False)}\n\n"
                 break
@@ -682,6 +685,25 @@ def save_index_selection():
         selected_indexes = data.get('selected_indexes', [])
         function_name = data.get('function_name', '')
         fun.add_indexer_list(function_name,selected_indexes,selected_indexes)
+        
+        return jsonify({
+            'message': 'Index selection saved successfully',
+            'selected_count': len(selected_indexes)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'保存索引选择失败: {str(e)}'}), 500
+
+
+@app.route('/api/save-nl-index', methods=['POST'])
+def save_nl_index():
+    """保存索引选择"""
+    try:
+        data = request.json
+        selected_indexes = data.get('selected_indexes', [])
+        print("selected_indexes:", selected_indexes)
+        for index in selected_indexes:
+            fun1.select_indexer(index)
         
         return jsonify({
             'message': 'Index selection saved successfully',
@@ -1339,4 +1361,4 @@ def delete_conversation(filename):
 
 
 if __name__=='__main__':
-    app.run(debug=True, port=3456)
+    app.run(debug=True, port=5000)

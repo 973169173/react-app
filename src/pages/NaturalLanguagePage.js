@@ -716,10 +716,19 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   };
 
   // 保存索引配置
-  const handleSaveIndexConfig = (selectedIndexIds, descriptions) => {
+  const handleSaveIndexConfig = async(selectedIndexIds, descriptions) => {
     setSelectedIndexes(selectedIndexIds);
     setIndexDescriptions(descriptions);
     setIndexConfigVisible(false);
+    const response = await fetch(getApiUrl('/api/save-nl-index'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        selected_indexes: selectedIndexIds
+      })
+    });
     message.success(`indexes saved successfully (${selectedIndexIds.length} indexes)`);
   };
 
