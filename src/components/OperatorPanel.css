@@ -571,6 +571,73 @@
   background: #e6f7ff !important;
 }
 
+/* 新的输出结果按钮容器，居中显示 */
+.output-result-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0 4px;
+}
+
+/* 协调主配色的结果查看按钮 */
+.output-result-btn {
+  background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  padding: 0 28px !important;
+  height: 40px !important;
+  border-radius: 24px !important;
+  box-shadow: 0 4px 14px rgba(64, 169, 255, 0.35) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.35s ease !important;
+}
+
+.output-result-btn .anticon {
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.output-result-btn:hover {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
+  box-shadow: 0 6px 18px rgba(24, 144, 255, 0.45) !important;
+  transform: translateY(-2px) !important;
+}
+
+.output-result-btn:active {
+  transform: translateY(0) scale(.97) !important;
+  box-shadow: 0 3px 10px rgba(24, 144, 255, 0.35) !important;
+}
+
+.operator-card[data-status="error"] .output-result-btn {
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%) !important;
+  box-shadow: 0 4px 14px rgba(255, 77, 79, 0.35) !important;
+}
+
+.operator-card[data-status="running"] .output-result-btn {
+  position: relative;
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
+  overflow: hidden;
+}
+
+.operator-card[data-status="running"] .output-result-btn:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.45) 50%, rgba(255,255,255,0) 100%);
+  animation: loading-shine 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-shine {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(300%); }
+}
+
 /* 运行状态指示 */
 .operator-card[data-status="running"] {
   border-color: rgba(24, 144, 255, 0.3) !important;
