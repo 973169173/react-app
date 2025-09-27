@@ -1,3 +1,9 @@
+// OperatorPanel：文档算子工作台，包含列表/DAG 视图、拖拽排序、参数配置、运行调用、结果查看（ResultViewer 弹窗）等。
+// 主要模块：
+// - IndexSelectionModal：索引选择弹窗
+// - ColumnInput / CustomSwitch / ParameterInput：参数输入控件
+// - SortableOperatorCard：单个算子卡片（支持拖拽、运行、内联输出表格、打开结果弹窗）
+// - OperatorPanel：顶层容器（列表/DAG 切换、批量运行、保存、索引选择、结果查看弹窗）
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Input, Select, Collapse, Space, Typography, Badge, Dropdown, Table, Modal, List, App, Tag, Segmented } from 'antd';
 import { 
@@ -13,12 +19,10 @@ import {
   NodeIndexOutlined,
   UpOutlined,
   DownOutlined,
-  ApiOutlined,
-  RobotOutlined,
-  ClockCircleOutlined,
-  ThunderboltOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import './OperatorPanel.css';
+import ResultViewer from './ResultViewer'; // 结果查看组件（以弹窗方式展示表格/图表等）
 import OperatorDAG from './OperatorDAG';
 import {
   DndContext,
@@ -45,6 +49,13 @@ const { Panel } = Collapse;
 const { Title, Text } = Typography;
 
 // 索引选择模态框组件
+// 用途：允许用户为当前项目选择可用索引，保存后将索引名称发往后端。
+// Props：
+// - visible: 是否显示
+// - onCancel/onSave: 关闭与保存回调
+// - availableIndexes: 可用索引列表（对象或字符串）
+// - selectedIndexes: 已选索引 id 列表
+// - loading: 加载态
 const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, loading }) => {
   const [localSelectedIndexes, setLocalSelectedIndexes] = useState([]);
 
@@ -122,6 +133,7 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
 };
 
 // 算子参数配置
+// 定义不同算子在 UI 上需要的参数项（标签、输入类型、占位符、可选项等）。
 const OPERATOR_PARAMETERS = {
   Extract: [
     { key: 'mode', label: 'Mode', type: 'select', options: ['basic', 'semantic'], placeholder: 'Select mode' },
@@ -164,6 +176,7 @@ const OPERATOR_PARAMETERS = {
 };
 
 // 列名输入组件
+// 用于编辑 Extract/Filter 等算子中的 columns（列名 + 描述）的动态数组。
 const ColumnInput = ({ value = [], onChange }) => {
   const handleAddColumn = () => {
     const newColumn = { columnname: '', description: '' };
@@ -229,7 +242,8 @@ const ColumnInput = ({ value = [], onChange }) => {
   );
 };
 
-// 自定义Switch组件
+// 自定义 Switch 组件
+// 仅用于显示一个简单的 ON/OFF 开关（无引入 antd Switch，保持样式统一）。
 const CustomSwitch = ({ checked = false, onChange, onLabel = 'ON', offLabel = 'OFF' }) => {
   const handleChange = (e) => {
     onChange(e.target.checked);
@@ -249,6 +263,7 @@ const CustomSwitch = ({ checked = false, onChange, onLabel = 'ON', offLabel = 'O
 };
 
 // 参数输入组件
+// 根据参数类型渲染不同的控件（select/textarea/number/input/columns/switch）。
 const ParameterInput = ({ parameter, value, onChange }) => {
   const handleChange = (newValue) => {
     onChange(parameter.key, newValue);
@@ -325,7 +340,17 @@ const ParameterInput = ({ parameter, value, onChange }) => {
 };
 
 // 可排序的算子卡片组件
-const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDeleteOperator, onDuplicateOperator, onRowClick }) => {
+// 功能：
+// - 支持拖拽排序（dnd-kit）
+// - 名称编辑 / 复制 / 删除 / 运行
+// - 展开/折叠参数表单
+// - 输出区：保留原有 Collapse 内联表格/文本展示；新增“View Result”按钮打开 ResultViewer 弹窗
+// Props：
+// - operator: 当前算子数据
+// - onOperatorChange/onRunOperator/onDeleteOperator/onDuplicateOperator: 对应操作回调
+// - onRowClick: 点击表格行后的回调（向上冒泡给页面）
+// - onOpenResult: 打开结果弹窗的回调（最小改动集成）
+const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDeleteOperator, onDuplicateOperator, onRowClick, onOpenResult }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(operator.name);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -468,33 +493,23 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
         {isCollapsed ? (
           // 折叠状态下的简化视图
           <div className="operator-grid collapsed">
-            <div className="grid-row four-columns">
+            <div className="grid-row">
               <div className="grid-item">
-                <div className="field-icon-label">
-                  <ApiOutlined className="field-icon" />
-                  <Text className="field-label">Type</Text>
-                </div>
+                <Text className="field-label">Type</Text>
                 <Text strong>{operator.type}</Text>
               </div>
               <div className="grid-item">
-                <div className="field-icon-label">
-                  <RobotOutlined className="field-icon" />
-                  <Text className="field-label">Model</Text>
-                </div>
+                <Text className="field-label">Model</Text>
                 <Text strong>{operator.model}</Text>
               </div>
+            </div>
+            <div className="grid-row">
               <div className="grid-item">
-                <div className="field-icon-label">
-                  <ThunderboltOutlined className="field-icon" />
-                  <Text className="field-label">Token</Text>
-                </div>
+                <Text className="field-label">Token</Text>
                 <Text strong>{operator.tokenUsage || 0}</Text>
               </div>
               <div className="grid-item">
-                <div className="field-icon-label">
-                  <ClockCircleOutlined className="field-icon" />
-                  <Text className="field-label">Time</Text>
-                </div>
+                <Text className="field-label">Time</Text>
                 <Text strong>{operator.executionTime || 0}s</Text>
               </div>
             </div>
@@ -603,79 +618,16 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
 
             {operator.output && (
               <div className="output-section">
-                <Collapse size="small">
-                  <Panel header="Output Result" key="1">
-                    {(() => {
-                      // 尝试解析为表格数据
-                      try {
-                        const data = JSON.parse(operator.output);
-                        if (Array.isArray(data?.columns) && Array.isArray(data?.data)) {
-                          // 过滤掉以 _ 开头的内部字段
-                          const visibleKeys = data.columns.filter(key => !key.startsWith('_'));
-                          const columns = visibleKeys.map(key => ({
-                            title: key,
-                            dataIndex: key,
-                            key: key,
-                            width: 120,
-                          }));
-                          
-                          const dataSource = data.data.map((arr, i) => {
-                            const obj = {};
-                            data.columns.forEach((k, j) => (obj[k] = arr[j]));
-                            obj.key = data.index?.[i] ?? i;
-                            return obj;
-                          });
-
-                          return (
-                            <Table
-                              columns={columns}
-                              dataSource={dataSource}
-                              pagination={false}
-                              size="small"
-                              bordered
-                              scroll={{ x: 'max-content' }}
-                              onRow={(record) => ({
-                                onClick: (event) => {
-                                  // 获取点击的列
-                                  const target = event.target;
-                                  let columnKey = null;
-                                  
-                                  // 尝试从td元素获取data-key属性
-                                  const td = target.closest('td');
-                                  if (td) {
-                                    // 获取列索引
-                                    const columnIndex = Array.from(td.parentNode.children).indexOf(td);
-                                    // 只从可见列中获取key，排除以_开头的字段
-                                    const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                    columnKey = visibleKeys[columnIndex];
-                                  }
-                                  
-                                  // 如果没找到，使用第一个可见列作为默认
-                                  if (!columnKey) {
-                                    const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                    columnKey = visibleKeys[0];
-                                  }
-                                  
-                                  //console.log('Clicked column:', columnKey, 'Value:', record[columnKey]);
-                                  
-                                  if (onRowClick) {
-                                    onRowClick(record, columnKey);
-                                  }
-                                },
-                                style: { cursor: 'pointer' }
-                              })}
-                            />
-                          );
-                        }
-                      } catch (e) {
-                        // 如果不是 JSON 或不是表格格式，就显示原始文本
-                      }
-                      
-                      // 默认显示文本
-                      return <Text code style={{ whiteSpace: 'pre-wrap' }}>{operator.output}</Text>;
-                    })()}
-                  </Panel>
-                </Collapse>
+                <div className="output-result-wrapper">
+                  <Button 
+                    className="output-result-btn" 
+                    size="middle" 
+                    icon={<EyeOutlined />} 
+                    onClick={() => onOpenResult && onOpenResult(operator)}
+                  >
+                    View Result
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -685,16 +637,25 @@ const SortableOperatorCard = ({ operator, onOperatorChange, onRunOperator, onDel
   );
 };
 
+// 顶层容器：OperatorPanel
+// Props：
+// - documents: 可选的文档列表（当前未直接使用）
+// - onRowClick: 表格行点击回调（透传到 ResultViewer 与内联表格）
+// - showBackButton/onBackToProjects: 顶部返回按钮控制
+// - projectInfo: 当前项目元信息（含 function_name / name 等）
 const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackToProjects, projectInfo }) => {
   const { message } = App.useApp();
   
   // 添加视图模式状态
-  const [viewMode, setViewMode] = useState('list'); // 'list' 或 'dag'
+  const [viewMode, setViewMode] = useState('list'); // 'list' 或 'dag'：切换列表视图与 DAG 视图
   
   // 添加 DAG 数据状态
   const [dagData, setDagData] = useState(null);
   
   const [operators, setOperators] = useState([]);
+  // 结果查看弹窗（最小改动集成）：保留原内联输出，同时提供更友好的 ResultViewer 弹窗
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [resultModalData, setResultModalData] = useState(null);
 
 
 
@@ -725,6 +686,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   const [savingWorkflow, setSavingWorkflow] = useState(false);
 
   // 获取可用索引列表
+  // 拉取后端可用索引（根据项目 function_name）
   const fetchIndexes = useCallback(async () => {
     setLoadingIndexes(true);
     try {
@@ -778,6 +740,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   };
 
+  // 新增一个默认算子（默认 Extract + basic 模式）
   const handleAddOperator = () => {
     const newOperator = {
       id: Date.now().toString(),
@@ -793,6 +756,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     setOperators([...operators, newOperator]);
   };
 
+  // 更新算子字段（支持动态重置参数，当切换到 Extract/Filter 时默认 basic 模式）
   const handleOperatorChange = (id, field, value) => {
     setOperators(operators.map(op => {
       if (op.id === id) {
@@ -812,6 +776,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   };
 
   // 更新项目的 function_name
+  // 更新项目的 function_name（后端保存，前端记录 new_function_name 以便后续调用）
   const updateProjectFunctionName = async (functionName) => {
     if (!projectInfo?.id || !functionName) return;
     
@@ -844,6 +809,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   };
 
+  // 运行单个算子：根据算子类型调用不同的 API，并将返回的表格数据 JSON 字符串化保存到 output
   const handleRunOperator = async(id) => {
     setOperators(operators.map(op => 
       op.id === id ? { ...op, status: 'running' } : op
@@ -875,7 +841,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         }
       }
 
-      // 获取选中索引的名称列表
+      // 获取选中索引的名称列表（后端按名称识别）
       const selectedIndexNames = selectedGlobalIndexes.map(id => {
         const index = availableIndexes.find(idx => idx.id === id);
         return index ? index.name : id;
@@ -944,7 +910,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         op.id === id ? { 
           ...op, 
           status: 'enabled',
-          output: JSON.stringify(data.table) // 将数据转为字符串存储
+          output: JSON.stringify(data.table) // 将表格数据转为字符串存储（内联表格 & ResultViewer 都依赖该字段）
           
         } : op
       ));
@@ -964,6 +930,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     setOperators(operators.filter(op => op.id !== id));
   };
 
+  // 复制算子（浅拷贝参数，生成新 id 与名称）
   const handleDuplicateOperator = (id) => {
     const operator = operators.find(op => op.id === id);
     if (operator) {
@@ -977,12 +944,19 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   };
 
+  // 打开结果查看弹窗（最小改动，不影响原有 Collapse 呈现）
+  const handleOpenResult = (operator) => {
+    setResultModalData({ name: operator.name, json: operator.output });
+    setResultModalOpen(true);
+  };
+
   // 处理索引选择
   const handleSelectIndexes = () => {
     setIndexModalVisible(true);
   };
 
   // 保存索引选择
+  // 保存索引选择：将选中的索引 id 映射为名称，并提交后端
   const handleSaveIndexSelection = async (selectedIndexIds) => {
     try {
       // 获取选中索引的名称列表
@@ -1018,6 +992,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   };
 
+  // 保存当前工作流到后端（含所有 operators）
   const handleSaveWorkflow = async () => {
     try {
       setSavingWorkflow(true);
@@ -1054,6 +1029,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     }
   };
 
+  // 批量运行：对 pending/enabled 状态的算子依次调用后端
   const handleRunAllOperators = () => {
     const pendingOperators = operators.filter(op => op.status === 'pending' || op.status === 'enabled');
     
@@ -1144,6 +1120,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   };
 
   // 加载项目数据 (operators, nodes, indeg, edges)
+  // 加载项目数据（operators + DAG 数据），用于初始化界面
   const loadProjectData = async (functionName) => {
     if (!functionName) return;
     
@@ -1367,6 +1344,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
                   onDeleteOperator={handleDeleteOperator}
                   onDuplicateOperator={handleDuplicateOperator}
                   onRowClick={onRowClick}
+                  onOpenResult={handleOpenResult}
                 />
               ))}
             </SortableContext>
@@ -1388,6 +1366,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       )}
 
       {/* 索引选择模态框 */}
+      {/* 索引选择模态框（在工具栏 Indexes 按钮中打开） */}
       <IndexSelectionModal
         visible={indexModalVisible}
         onCancel={() => setIndexModalVisible(false)}
@@ -1396,6 +1375,22 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         selectedIndexes={selectedGlobalIndexes}
         loading={loadingIndexes}
       />
+
+      {/* 结果查看弹窗（最小侵入）：不影响原 Collapse 内联输出，仅作为更易用的查看方式 */}
+      <Modal
+        title={resultModalData ? `Result - ${resultModalData.name}` : 'Result'}
+        open={resultModalOpen}
+        onCancel={() => setResultModalOpen(false)}
+        footer={null}
+        width={1200}
+        centered
+        destroyOnClose
+        style={{ top: 40 }}
+      >
+        {resultModalData && (
+          <ResultViewer resultJSON={resultModalData.json} onRowClick={onRowClick} />
+        )}
+      </Modal>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Card, Table, Space, Typography, Empty, Segmented, Select, Tooltip, Button, Alert, Divider, Switch, Statistic, Progress, message } from 'antd';
+import { Card, Table, Space, Typography, Empty, Segmented, Select, Tooltip, Button, Alert, Divider, Switch, Statistic, Progress, message, Input, Modal } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { ExportOutlined, BarChartOutlined, TableOutlined, InfoCircleOutlined } from '@ant-design/icons';
@@ -44,8 +44,9 @@ function inferFields(rows, columns) {
 // Props:
 //  resultJSON: 原始表格结果（保持现有逻辑）
 //  onRowClick: 行点击回调
-//  analysisParams: { foName, tableName } 可选，如提供则展示“分析”模式
-const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
+//  analysisParams: { foName, tableName } 可选，如提供则展示“AI分析”模式
+//  onFoNameChange: (newFoName) => void  当后端 analyze_table 返回新的 fo 名称时回调父组件
+const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }) => {
   const [vizType, setVizType] = useState('table');
   const [catField, setCatField] = useState(null);
   const [numField, setNumField] = useState(null);
@@ -56,7 +57,31 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
   const [analysisResults, setAnalysisResults] = useState([]);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState(null);
-  const hasAnalysisContext = !!(analysisParams?.foName && analysisParams?.tableName);
+  // 当前用于分析请求的 fo 名称（会因 analyze 动作而演化）
+  const [currentFoName, setCurrentFoName] = useState(analysisParams?.foName || '');
+  const hasAnalysisContext = !!(currentFoName && analysisParams?.tableName);
+  // 触发重新拉取分析结果的 token
+  const [analysisReloadToken, setAnalysisReloadToken] = useState(0);
+
+  // 分析生成面板相关状态
+  const ANALYSIS_TYPES = ['auto','histogram','bar','pie','line','scatter'];
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [analysisColumn, setAnalysisColumn] = useState(null);
+  const [analysisTypeSel, setAnalysisTypeSel] = useState('auto');
+  const [analysisBins, setAnalysisBins] = useState();
+  const [analysisTitle, setAnalysisTitle] = useState('');
+  const [generating, setGenerating] = useState(false);
+
+  // 同步外部传入 foName 变化（例如父组件切换项目）
+  useEffect(() => {
+    if (analysisParams?.foName && analysisParams.foName !== currentFoName) {
+      setCurrentFoName(analysisParams.foName);
+      // 切换项目时清空现有分析结果显示，等待重新拉取
+      setAnalysisResults([]);
+      setSelectedAnalysisId(null);
+      setAnalysisReloadToken(t => t + 1);
+    }
+  }, [analysisParams?.foName]);
   // 简化交互：不再暴露排序和分组等高级选项
 
   // Parse and memoize
@@ -117,7 +142,7 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
     async function fetchAnalysis() {
       setAnalysisLoading(true);
       try {
-        const qs = new URLSearchParams({ fo_name: analysisParams.foName, table_name: analysisParams.tableName });
+        const qs = new URLSearchParams({ fo_name: currentFoName, table_name: analysisParams.tableName });
         const resp = await fetch(`http://localhost:5000/api/analysis-results?${qs.toString()}`, { signal: controller.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
@@ -132,7 +157,7 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
     }
     fetchAnalysis();
     return () => controller.abort();
-  }, [vizType, hasAnalysisContext, analysisParams, selectedAnalysisId]);
+  }, [vizType, hasAnalysisContext, analysisParams?.tableName, selectedAnalysisId, currentFoName, analysisReloadToken]);
 
   // 解析选择的后端分析图数据 -> echarts option
   const analysisChartOption = useMemo(() => {
@@ -503,7 +528,7 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
           { label: '柱状', value: 'column', icon: <BarChartOutlined /> },
           { label: '折线', value: 'line', icon: <BarChartOutlined />, disabled: timeFields.length === 0 },
           { label: '散点', value: 'scatter', icon: <BarChartOutlined />, disabled: numeric.length === 0 },
-          ...(hasAnalysisContext ? [{ label: '分析', value: 'analysis', icon: <BarChartOutlined /> }] : []),
+          ...(hasAnalysisContext ? [{ label: 'AI分析', value: 'analysis', icon: <BarChartOutlined /> }] : []),
         ]}
         size="small"
       />
@@ -601,6 +626,10 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
                 }))}
                 dropdownMatchSelectWidth={false}
               />
+              <Button size="small" type="primary" onClick={() => {
+                setAnalysisColumn(analysisColumn || columns[0]);
+                setShowGenerateModal(true);
+              }}>生成分析</Button>
               <Button size="small" onClick={() => setVizType('table')}>返回表格</Button>
               <Button size="small" onClick={() => setVizType('pie')}>本地可视化</Button>
             </Space>
@@ -620,6 +649,88 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
               <Alert type="info" message="请选择一个图表" />
             )}
           </Space>
+          <Modal
+            open={showGenerateModal}
+            title="生成后端分析图表"
+            onCancel={() => { if (!generating) setShowGenerateModal(false); }}
+            onOk={async () => {
+              if (!analysisColumn || !analysisTypeSel) {
+                message.warning('请选择列与分析类型');
+                return;
+              }
+              try {
+                setGenerating(true);
+                const body = {
+                  fo_name: currentFoName,
+                  table_name: analysisParams.tableName,
+                  column_name: analysisColumn,
+                  analysis_type: analysisTypeSel,
+                  bins: analysisTypeSel === 'histogram' ? (Number(analysisBins) || undefined) : undefined,
+                  title: analysisTitle || undefined,
+                };
+                const resp = await fetch('http://localhost:5000/api/analyze-table', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (!data.new_function_name) throw new Error('返回缺少 new_function_name');
+                const newFo = data.new_function_name;
+                setCurrentFoName(newFo);
+                if (onFoNameChange) onFoNameChange(newFo);
+                message.success('分析生成成功');
+                setShowGenerateModal(false);
+                setSelectedAnalysisId(null);
+                setAnalysisReloadToken(t => t + 1);
+              } catch (e) {
+                message.error('分析生成失败: ' + e.message);
+              } finally {
+                setGenerating(false);
+              }
+            }}
+            okButtonProps={{ loading: generating }}
+            destroyOnClose
+            maskClosable={!generating}
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              <div>
+                <Text type="secondary">当前 fo (版本)：</Text>
+                <Text code>{currentFoName || '-'}</Text>
+              </div>
+              <Select
+                size="small"
+                style={{ width: '100%' }}
+                value={analysisColumn}
+                onChange={setAnalysisColumn}
+                placeholder="选择分析列"
+                options={columns.map(c => ({ label: c, value: c }))}
+              />
+              <Select
+                size="small"
+                style={{ width: '100%' }}
+                value={analysisTypeSel}
+                onChange={setAnalysisTypeSel}
+                placeholder="选择分析类型"
+                options={ANALYSIS_TYPES.map(t => ({ label: t, value: t }))}
+              />
+              {analysisTypeSel === 'histogram' && (
+                <Input
+                  size="small"
+                  placeholder="bins (可选, 默认自动)"
+                  value={analysisBins}
+                  onChange={e => setAnalysisBins(e.target.value)}
+                />
+              )}
+              <Input
+                size="small"
+                placeholder="图表标题 (可选)"
+                value={analysisTitle}
+                onChange={e => setAnalysisTitle(e.target.value)}
+              />
+              <Alert type="info" showIcon message="说明" description="点击确定后将调用后端 /api/analyze-table 接口生成图表数据，并产生新的函数版本 fo_name。" />
+            </Space>
+          </Modal>
         </div>
       );
     }
@@ -661,40 +772,44 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams }) => {
     return (
       <>
         {contextBar()}
-  {vizType === 'table' ? (
-          <>
-            <div className="result-context">
-              <Text>本次查询到了符合条件的</Text>
-              <Text strong style={{ margin: '0 4px' }}>{rows.length}</Text>
-              <Text>条数据，每条数据包含</Text>
-              <Text strong style={{ margin: '0 4px' }}>{columns.length}</Text>
-              <Text>类信息</Text>
-            </div>
-            <Table
-            columns={tableColumns}
-            dataSource={rows.map((r, i) => ({ ...r, zebra: i % 2 }))}
-            rowClassName={(_, i) => (i % 2 ? 'zebra-row' : '')}
-            pagination={{ pageSize: 10, size: dense ? 'small' : 'default' }}
-            size={dense ? 'small' : 'middle'}
-            bordered
-            sticky
-            scroll={{ x: 'max-content', y: 360 }}
-            onRow={(record) => ({
-              onClick: (event) => {
-                const td = event.target.closest('td');
-                let columnKey = null;
-                if (td) {
-                  const idx = Array.from(td.parentNode.children).indexOf(td);
-                  const keys = Object.keys(record).filter((k) => !k.startsWith('_'));
-                  columnKey = keys[idx] || keys[0];
-                }
-                onRowClick && onRowClick(record, columnKey);
-              },
-              style: { cursor: 'pointer' },
-            })}
-          />
-          </>
-        ) : vizType === 'pie' ? (
+    {vizType === 'table' ? (
+            <>
+              <div className="result-context">
+                <Text>本次查询到了符合条件的</Text>
+                <Text strong style={{ margin: '0 4px' }}>{rows.length}</Text>
+                <Text>条数据，每条数据包含</Text>
+                <Text strong style={{ margin: '0 4px' }}>{columns.length}</Text>
+                <Text>类信息</Text>
+              </div>
+              <Table
+                columns={tableColumns}
+                dataSource={rows.map((r, i) => ({ ...r, zebra: i % 2 }))}
+                rowClassName={(_, i) => (i % 2 ? 'zebra-row' : '')}
+                pagination={{ pageSize: 10, size: dense ? 'small' : 'default' }}
+                size={dense ? 'small' : 'middle'}
+                bordered
+                sticky
+                scroll={{ x: 'max-content', y: 360 }}
+                onRow={(record) => ({
+                  onClick: (event) => {
+                    try {
+                      const td = event.target.closest('td');
+                      const visibleCols = columns; // 已过滤 _ 前缀
+                      let columnKey = visibleCols[0];
+                      if (td) {
+                        const idx = Array.from(td.parentNode.children).indexOf(td);
+                        if (idx >= 0 && idx < visibleCols.length) columnKey = visibleCols[idx];
+                      }
+                      if (onRowClick) onRowClick(record, columnKey);
+                    } catch (err) {
+                      console.warn('Row click handler error:', err);
+                    }
+                  },
+                  style: { cursor: 'pointer' }
+                })}
+              />
+            </>
+          ) : vizType === 'pie' ? (
           <div className="chart-grid two-col">
             <div className="chart-area fade-in">
               {!chartOption ? (
@@ -796,7 +911,7 @@ function formatCSVCell(val) {
   return s;
 }
 
-export default ResultViewer;
+export default ResultViewer; // expose enhanced component supporting AI分析 (后端 analyze_table)
 
 // Best-effort PNG export using canvas from charts; relies on AntV plot instances on DOM
 function exportChartPNG() {
