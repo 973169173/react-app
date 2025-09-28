@@ -908,16 +908,20 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
 
       await updateProjectFunctionName(data.function_info?.foname);
       console.log(projectInfo)
-      setOperators(prev => prev.map(op => 
-        op.id === id ? { 
-          ...op, 
-          status: 'enabled',
-          output: JSON.stringify(data.table), // 将表格数据转为字符串存储（内联表格 & ResultViewer 都依赖该字段）
-          tokenUsage: data.function_info?.token || 0,
-          executionTime: data.function_info?.time || 0
-        } : op
-      ));
-      handleSaveWorkflow();
+      setOperators(prev => {
+        const updatedOperators = prev.map(op => 
+          op.id === id ? { 
+            ...op, 
+            status: 'enabled',
+            output: JSON.stringify(data.table), // 将表格数据转为字符串存储（内联表格 & ResultViewer 都依赖该字段）
+            tokenUsage: data.function_info?.token || 0,
+            executionTime: data.function_info?.time || 0
+          } : op
+        );
+        // 使用更新后的状态立即保存
+        setTimeout(() => handleSaveWorkflowWithOperators(updatedOperators), 0);
+        return updatedOperators;
+      });
     }
     catch (e) {
       console.error('API调用失败:', e);
@@ -997,21 +1001,26 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
 
   // 保存当前工作流到后端（含所有 operators）
   const handleSaveWorkflow = async () => {
+    return handleSaveWorkflowWithOperators(operators);
+  };
+
+  // 使用指定的 operators 保存工作流
+  const handleSaveWorkflowWithOperators = async (operatorsToSave) => {
     try {
       setSavingWorkflow(true);
       
       const workflow = {
-        operators
+        operators: operatorsToSave
       };
-      
-  const response = await fetch(getApiUrl('/api/save-workflow'), {
+      console.log('Saving workflow:', workflow);
+      const response = await fetch(getApiUrl('/api/save-workflow'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           function_name: projectInfo?.function_name,
-          operators:workflow
+          operators: workflow
         })
       });
       
@@ -1389,7 +1398,6 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         centered
         destroyOnClose
         style={{ top: 40 }}
-        zIndex={900} // 降低结果弹窗层级，确保外部原始文档预览（若使用更高 z-index，如 1000+）始终显示在其上方
       >
         {resultModalData && (
           <ResultViewer resultJSON={resultModalData.json} onRowClick={onRowClick} />

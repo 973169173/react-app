@@ -794,17 +794,30 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
                 scroll={{ x: 'max-content', y: 360 }}
                 onRow={(record) => ({
                   onClick: (event) => {
-                    try {
-                      const td = event.target.closest('td');
-                      const visibleCols = columns; // 已过滤 _ 前缀
-                      let columnKey = visibleCols[0];
-                      if (td) {
-                        const idx = Array.from(td.parentNode.children).indexOf(td);
-                        if (idx >= 0 && idx < visibleCols.length) columnKey = visibleCols[idx];
-                      }
-                      if (onRowClick) onRowClick(record, columnKey);
-                    } catch (err) {
-                      console.warn('Row click handler error:', err);
+                                        // 获取点击的列
+                    const target = event.target;
+                    let columnKey = null;
+                    
+                    // 尝试从td元素获取data-key属性
+                    const td = target.closest('td');
+                    if (td) {
+                      // 获取列索引
+                      const columnIndex = Array.from(td.parentNode.children).indexOf(td);
+                      // 只从可见列中获取key，排除以_开头的字段
+                      const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
+                      columnKey = visibleKeys[columnIndex];
+                    }
+                    
+                    // 如果没找到，使用第一个可见列作为默认
+                    if (!columnKey) {
+                      const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
+                      columnKey = visibleKeys[0];
+                    }
+                    
+                    //console.log('Clicked column:', columnKey, 'Value:', record[columnKey]);
+                    
+                    if (onRowClick) {
+                      onRowClick(record, columnKey);
                     }
                   },
                   style: { cursor: 'pointer' }
