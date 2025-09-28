@@ -1388,6 +1388,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         centered
         destroyOnClose
         style={{ top: 40 }}
+        zIndex={900} // 降低结果弹窗层级，确保外部原始文档预览（若使用更高 z-index，如 1000+）始终显示在其上方
       >
         {resultModalData && (
           <ResultViewer resultJSON={resultModalData.json} onRowClick={onRowClick} />
