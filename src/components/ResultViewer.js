@@ -784,43 +784,32 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
                 <Text>类信息</Text>
               </div>
               <Table
-                              columns={columns}
-                              dataSource={dataSource}
-                              pagination={false}
-                              size="small"
-                              bordered
-                              scroll={{ x: 'max-content' }}
-                              onRow={(record) => ({
-                                onClick: (event) => {
-                                  // 获取点击的列
-                                  const target = event.target;
-                                  let columnKey = null;
-                                  
-                                  // 尝试从td元素获取data-key属性
-                                  const td = target.closest('td');
-                                  if (td) {
-                                    // 获取列索引
-                                    const columnIndex = Array.from(td.parentNode.children).indexOf(td);
-                                    // 只从可见列中获取key，排除以_开头的字段
-                                    const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                    columnKey = visibleKeys[columnIndex];
-                                  }
-                                  
-                                  // 如果没找到，使用第一个可见列作为默认
-                                  if (!columnKey) {
-                                    const visibleKeys = Object.keys(record).filter(key => !key.startsWith('_'));
-                                    columnKey = visibleKeys[0];
-                                  }
-                                  
-                                  //console.log('Clicked column:', columnKey, 'Value:', record[columnKey]);
-                                  
-                                  if (onRowClick) {
-                                    onRowClick(record, columnKey);
-                                  }
-                                },
-                                style: { cursor: 'pointer' }
-                              })}
-                            />
+                columns={tableColumns}
+                dataSource={rows.map((r, i) => ({ ...r, zebra: i % 2 }))}
+                rowClassName={(_, i) => (i % 2 ? 'zebra-row' : '')}
+                pagination={{ pageSize: 10, size: dense ? 'small' : 'default' }}
+                size={dense ? 'small' : 'middle'}
+                bordered
+                sticky
+                scroll={{ x: 'max-content', y: 360 }}
+                onRow={(record) => ({
+                  onClick: (event) => {
+                    try {
+                      const td = event.target.closest('td');
+                      const visibleCols = columns; // 已过滤 _ 前缀
+                      let columnKey = visibleCols[0];
+                      if (td) {
+                        const idx = Array.from(td.parentNode.children).indexOf(td);
+                        if (idx >= 0 && idx < visibleCols.length) columnKey = visibleCols[idx];
+                      }
+                      if (onRowClick) onRowClick(record, columnKey);
+                    } catch (err) {
+                      console.warn('Row click handler error:', err);
+                    }
+                  },
+                  style: { cursor: 'pointer' }
+                })}
+              />
             </>
           ) : vizType === 'pie' ? (
           <div className="chart-grid two-col">
