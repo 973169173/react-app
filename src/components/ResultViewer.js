@@ -23,12 +23,11 @@ function toTableModel(data) {
     obj.key = data.index?.[i] ?? i;
     return obj;
   });
-  const cleanRows = rows.map((r) => {
-    const o = { key: r.key };
-    visibleCols.forEach((k) => (o[k] = r[k]));
-    return o;
-  });
-  return { columns: visibleCols, rows: cleanRows };
+  // 保留所有原始列（包括以 _ 开头的内部字段）在 rows 里，
+  // 仅通过 columns 控制展示哪些字段。
+  // 这样下游 onRowClick(record, columnKey) 时，record 仍然包含 _source_ 等内部字段，
+  // 方便继续做原文 / 高亮匹配或其它逻辑（与旧版本行为保持一致）。
+  return { columns: visibleCols, rows };
 }
 
 function inferFields(rows, columns) {
