@@ -1398,6 +1398,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         centered
         destroyOnClose
         style={{ top: 40 }}
+        zIndex={900} 
       >
         {resultModalData && (
           <ResultViewer resultJSON={resultModalData.json} onRowClick={onRowClick} />
