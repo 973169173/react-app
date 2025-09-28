@@ -906,14 +906,15 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
       
       // 如果返回了 function_name，更新项目信息并保存到 projects.json
 
-      await updateProjectFunctionName(data.function_name);
+      await updateProjectFunctionName(data.function_info?.foname);
       console.log(projectInfo)
       setOperators(prev => prev.map(op => 
         op.id === id ? { 
           ...op, 
           status: 'enabled',
-          output: JSON.stringify(data.table) // 将表格数据转为字符串存储（内联表格 & ResultViewer 都依赖该字段）
-          
+          output: JSON.stringify(data.table), // 将表格数据转为字符串存储（内联表格 & ResultViewer 都依赖该字段）
+          tokenUsage: data.function_info?.token || 0,
+          executionTime: data.function_info?.time || 0
         } : op
       ));
       handleSaveWorkflow();

@@ -144,14 +144,14 @@ def extract_data():
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
     prompt,mode,tablename,columnname,columns_prompt=parameters.get('prompt',''),parameters.get('mode',''),parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
     print(type,prompt,model,parameters)
-    fo_name = ""
+    fun_info = {}
     if(mode == 'basic'):
-        fo_name=fun.extract_text(foname,tablename,columnname,columns_prompt)
+        fun_info=fun.extract_text(foname,tablename,columnname,columns_prompt)
     elif(mode == 'semantic'):
-        fo_name=fun.extract_text_semantic(foname,tablename,columns_prompt)
-    df=fun.show_table_with_source(fo_name,tablename)
+        fun_info=fun.extract_text_semantic(foname,tablename,columns_prompt)
+    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
     return jsonify({
-        'function_name':fo_name,
+        'function_info':fun_info,
         'table':df.to_dict(orient="split")})
     
 
@@ -160,13 +160,14 @@ def filter():
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
     tablename,condition,columnname,columns_prompt,mode,prompt=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name',''),parameters.get('columns_prompt',''),parameters.get('mode',''),parameters.get('prompt','')
     print(type,prompt,model,parameters)
+    fun_info = {}
     if(mode == 'basic'):
-        fo_name=fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
+        fun_info =fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
     elif(mode == 'semantic'):
-        fo_name=fun.filter_text_semantic(foname,tablename,prompt)
-    df=fun.show_table_with_source(fo_name,tablename)
+        fun_info=fun.filter_text_semantic(foname,tablename,prompt)
+    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
     return jsonify({
-        'function_name':fo_name,
+        'function_info':fun_info,
         'table':df.to_dict(orient="split")})
 
 @app.route('/api/retrieve', methods=['POST'])
@@ -178,12 +179,12 @@ def retrieve():
     print(type,prompt,model,parameters)
     indexer_name_list = fun.get_database_indexer_name_list()  # Modify
     print("indexer: ", indexer_name_list)
-
+    fun_info = {}
     foname = fun.add_indexer_list(foname, indexer_name_list, indexer_name_list)
-    fo_name=fun.retrieve_text(foname,tablename,columnname,prompt)
-    df=fun.show_table_with_source(fo_name,tablename)
+    fun_info=fun.retrieve_text(foname,tablename,columnname,prompt)
+    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
     return jsonify({
-        'function_name':fo_name,
+        'function_info':fun_info,
         'table':df.to_dict(orient="split")})
 
 
@@ -1468,4 +1469,4 @@ def delete_conversation(filename):
 
 
 if __name__=='__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5002)
