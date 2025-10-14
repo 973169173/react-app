@@ -11,6 +11,42 @@ const { Text } = Typography;
 // Shared palette for pie slices and insights matching
 const PIE_PALETTE = ['#2ec7c9','#b6a2de','#5ab1ef','#ffb980','#d87a80','#8d98b3','#e5cf0d','#97b552','#95706d','#dc69aa','#07a2a4','#9a7fd1','#588dd5','#f5994e','#c05050','#59678c','#c9ab00','#7eb00a','#6f5553','#c14089'];
 
+// 动态图片预览：如果表中存在 figure / image / photo / picture 列，则在行悬浮时展示对应 base64 图片
+// 不再使用固定测试图片
+
+const IMAGE_COLUMN_CANDIDATES = ['figure','image','photo','picture','img'];
+
+// Heuristic to decide whether a value looks like a base64-encoded image
+function isLikelyBase64Image(val) {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (trimmed.startsWith('data:image/')) return true; // already a data url
+  if (trimmed.length < 200) return false; // too short to be a real image
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(trimmed)) return false; // invalid base64 charset
+  const head = trimmed.slice(0, 16);
+  const signatureOk = head.startsWith('/9j/') || head.startsWith('iVBOR') || head.startsWith('R0lGOD') || head.startsWith('UklGR');
+  if (!signatureOk) return false;
+  try { atob(trimmed.slice(0, 80)); } catch { return false; }
+  return true;
+}
+
+function guessImageMimeFromBase64(b64) {
+  if (!b64 || typeof b64 !== 'string') return 'image/png';
+  const head = b64.slice(0, 16);
+  if (head.startsWith('/9j/')) return 'image/jpeg'; // JPEG
+  if (head.startsWith('iVBOR')) return 'image/png'; // PNG
+  if (head.startsWith('UklGR')) return 'image/webp'; // WEBP
+  if (head.startsWith('R0lGOD')) return 'image/gif'; // GIF
+  return 'image/png';
+}
+
+function buildDataUrlFromBase64(b64) {
+  if (!b64) return null;
+  if (b64.startsWith('data:image')) return b64; // already complete
+  const mime = guessImageMimeFromBase64(b64);
+  return `data:${mime};base64,${b64}`;
+}
+
 // Convert backend table shape {columns: [], data: [], index?: []} to rows/columns for antd
 function toTableModel(data) {
   if (!data || !Array.isArray(data.columns) || !Array.isArray(data.data)) {
@@ -31,11 +67,14 @@ function toTableModel(data) {
 }
 
 function inferFields(rows, columns) {
+  // Relaxed numeric detection: treat string numbers (e.g. "23") as numeric too.
+  // This fixes cases where backend sends numeric-looking columns as strings (DataFrame object dtype).
   const numeric = [];
   const categorical = [];
   columns.forEach((c) => {
-    const sample = rows.find((r) => r[c] !== null && r[c] !== undefined)?.[c];
-    if (typeof sample === 'number') numeric.push(c);
+    const sampleRow = rows.find((r) => r && r[c] !== null && r[c] !== undefined);
+    const sample = sampleRow ? sampleRow[c] : undefined;
+    if (isProbablyNumeric(sample)) numeric.push(c);
     else categorical.push(c);
   });
   return { numeric, categorical };
@@ -54,6 +93,8 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
   const [xField, setXField] = useState(null);
   const [yField, setYField] = useState(null);
   const [dense, setDense] = useState(true);
+  // Hover image preview state (dynamic figure)
+  const [hoverPreview, setHoverPreview] = useState({ visible: false, x: 0, y: 0, src: null, rowKey: null });
   // 后端分析结果
   const [analysisResults, setAnalysisResults] = useState([]);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -97,6 +138,35 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
   const isTabular = parsed && Array.isArray(parsed?.columns) && Array.isArray(parsed?.data);
   const { columns, rows } = useMemo(() => (isTabular ? toTableModel(parsed) : { columns: [], rows: [] }), [parsed, isTabular]);
   const { numeric, categorical } = useMemo(() => inferFields(rows, columns), [rows, columns]);
+  // 可见图片列（列名符合候选且样本值像图片）
+  const visibleImageColumn = useMemo(() => {
+    for (const c of columns) {
+      if (IMAGE_COLUMN_CANDIDATES.includes(String(c).toLowerCase())) {
+        const sample = rows.find(r => r && r[c])?.[c];
+        if (isLikelyBase64Image(sample)) return c;
+      }
+    }
+    return null;
+  }, [columns, rows]);
+
+  // 隐藏图片列（以 _ 开头保留在 row 对象中，比如 _figure）
+  const hiddenImageColumn = useMemo(() => {
+    if (visibleImageColumn) return null; // 优先使用可见列
+    if (!rows.length) return null;
+    const sampleRow = rows.find(r => r);
+    if (!sampleRow) return null;
+    const keys = Object.keys(sampleRow).filter(k => k.startsWith('_'));
+    for (const k of keys) {
+      const lower = k.toLowerCase();
+      if (IMAGE_COLUMN_CANDIDATES.some(c => lower.endsWith(c))) {
+        const sample = rows.find(r => r && r[k])?.[k];
+        if (isLikelyBase64Image(sample)) return k;
+      }
+    }
+    return null;
+  }, [rows, visibleImageColumn]);
+
+  const imageField = visibleImageColumn || hiddenImageColumn;
   // 自动检测时间型字段（基于字段名与取样解析）
   const timeFields = useMemo(() => detectTimeFields(rows, columns), [rows, columns]);
 
@@ -806,6 +876,19 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
                       console.warn('Row click handler error:', err);
                     }
                   },
+                  onMouseEnter: (e) => {
+                    if (!imageField) return; // 无图片列不显示
+                    const raw = record[imageField];
+                    const src = buildDataUrlFromBase64(raw);
+                    if (!src) return;
+                    setHoverPreview({ visible: true, x: e.clientX + 16, y: e.clientY + 12, src, rowKey: record.key });
+                  },
+                  onMouseMove: (e) => {
+                    setHoverPreview(prev => prev.visible ? { ...prev, x: e.clientX + 16, y: e.clientY + 12 } : prev);
+                  },
+                  onMouseLeave: () => {
+                    setHoverPreview(prev => prev.visible ? { ...prev, visible: false } : prev);
+                  },
                   style: { cursor: 'pointer' }
                 })}
               />
@@ -887,6 +970,14 @@ const ResultViewer = ({ resultJSON, onRowClick, analysisParams, onFoNameChange }
   return (
     <Card size="small" className="result-viewer-card" title={toolbar} bordered={false}>
       {content()}
+      {hoverPreview.visible && hoverPreview.src && (
+        <div
+          className="rv-image-preview"
+          style={{ left: hoverPreview.x, top: hoverPreview.y }}
+        >
+          <img src={hoverPreview.src} alt="preview" />
+        </div>
+      )}
     </Card>
   );
 };
