@@ -473,6 +473,14 @@ def nl():
     print(type(query), query)
     print(type(desc), desc)
     df=fun.solve_agent(table,query,desc)
+    # data={
+    #     'doc':['Aaron_Williams.txt','1111111','222222222'],
+    #     'age':['30','12','212'],
+    #     'name':['Aaron Williams','121','121'],
+    #     '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
+    #     '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
+    # }
+    # df=pd.DataFrame(data)
     return jsonify(df.to_dict(orient="split"))
 
 
@@ -1469,4 +1477,4 @@ def delete_conversation(filename):
 
 
 if __name__=='__main__':
-    app.run(debug=True, port=5002)
+    app.run(debug=True, port=5003)

@@ -275,11 +275,11 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       type: 'assistant',
       content: 'I found that your document contains information about several NBA players.',
       output: JSON.stringify({
-        columns: ['document_name', 'player_type', '_source_document_name'],
+        columns: ['doc', 'age', 'name', '_source_age', '_source_name'],
         data: [
-          ['Aaron_Williams.txt', 'NBA Player'],
-          ['Andre_Drummond.txt', 'NBA Player'],
-          ['Angelo_Russell.txt', 'NBA Player']
+          ['Al_Horford.txt', 'None', 'Aaron Williams', 'Celtics, Horford helped the Hawks take the eventual champions to seven games', 'Al Horford sends reassuring message on Celtics after Kristaps Porzingis injury'],
+          ['1111111', '12', '121', '121', '111'],
+          ['222222222', '212', '121', '121', '111']
         ],
         index: [0, 1, 2]
       }),
