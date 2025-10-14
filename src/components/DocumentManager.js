@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Space, Typography, Upload, message, Modal, Input, List, Tree } from 'antd';
 import { 
   UploadOutlined, 
@@ -24,6 +24,9 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const [uploading, setUploading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [highlightText, setHighlightText] = useState(null);
+  const [isNoneValue, setIsNoneValue] = useState(false); // 标识是否为 None 值
+  const highlightRef = useRef(null); // 用于引用高亮元素
+  const [scrollTrigger, setScrollTrigger] = useState(0); // 用于触发滚动
   const [buildIndexModalVisible, setBuildIndexModalVisible] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [buildingIndex, setBuildingIndex] = useState(false);
@@ -86,15 +89,39 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   useEffect(() => {
     if (onDocumentPreview) {
       // 创建一个全局方法供外部调用
-      window.triggerDocumentPreview = (document, highlightText) => {
-        //console.log('triggerDocumentPreview called:', document, highlightText);
+      window.triggerDocumentPreview = (document, highlightText, isNone = false) => {
+        //console.log('triggerDocumentPreview called:', document, highlightText, isNone);
         setPreviewDocument(document);
         setHighlightText(highlightText);
+        setIsNoneValue(isNone);
         setPreviewVisible(true);
+        // 触发滚动
+        setScrollTrigger(prev => prev + 1);
       };
       //console.log('Global triggerDocumentPreview function set');
     }
   }, [onDocumentPreview]);
+
+  // 自动滚动到高亮位置
+  useEffect(() => {
+    if (previewVisible && highlightText && scrollTrigger > 0) {
+      // 使用 setTimeout 确保 DOM 已经渲染完成
+      const timer = setTimeout(() => {
+        if (highlightRef.current) {
+          
+          highlightRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        } else {
+          console.log('highlightRef.current is null');
+        }
+      }, 150); // 减少延迟时间以提高响应速度
+      
+      return () => clearTimeout(timer);
+    }
+  }, [scrollTrigger]);
 
   const handlePreview = async (document, highlight = null) => {
     if (document.type.includes('pdf') || document.name.toLowerCase().endsWith('.pdf')) {
@@ -330,7 +357,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   };
 
   // 高亮文本功能
-  const highlightContent = (content, highlight) => {
+  const highlightContent = (content, highlight, isNone = false) => {
     if (!highlight || !content) return content;
     
     // 确保 highlight 是列表
@@ -341,23 +368,37 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
     const parts = content.split(regex);
     
+    // 根据是否为 None 值选择不同的高亮颜色
+    const highlightStyle = isNone ? {
+      backgroundColor: '#a8a8a8ff', // 橙色用于 None 值
+      color: '#000',
+      padding: '2px 4px',
+      borderRadius: '2px',
+      fontWeight: 'bold'
+    } : {
+      backgroundColor: '#ffeb3b', // 黄色用于正常值
+      color: '#000',
+      padding: '2px 4px',
+      borderRadius: '2px',
+      fontWeight: 'bold'
+    };
+    
+    let isFirstMatch = true; // 标记是否为第一个匹配项
+    
     return parts.map((part, index) => {
       const match = highlights.find(h => part.toLowerCase() === h.toLowerCase());
       if (match) {
-        return (
+        const element = (
           <span 
-            key={index} 
-            style={{ 
-              backgroundColor: '#ffeb3b', 
-              color: '#000',
-              padding: '2px 4px',
-              borderRadius: '2px',
-              fontWeight: 'bold'
-            }}
+            key={index}
+            ref={isFirstMatch ? highlightRef : null} // 只给第一个匹配项添加 ref
+            style={highlightStyle}
           >
             {part}
           </span>
         );
+        isFirstMatch = false; // 后续匹配项不添加 ref
+        return element;
       }
       return part;
     });
@@ -664,6 +705,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
         onCancel={() => {
           setPreviewVisible(false);
           setHighlightText(null);
+          setIsNoneValue(false);
         }}
         width={800}
         footer={[
@@ -673,6 +715,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
           <Button key="close" onClick={() => {
             setPreviewVisible(false);
             setHighlightText(null);
+            setIsNoneValue(false);
           }}>
             Close
           </Button>
@@ -689,7 +732,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
           }}>
             <div style={{ whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: '1.6' }}>
               {highlightText ? 
-                highlightContent(previewDocument.content || 'Unable to display file content', highlightText) :
+                highlightContent(previewDocument.content || 'Unable to display file content', highlightText, isNoneValue) :
                 (previewDocument.content || 'Unable to display file content')
               }
             </div>

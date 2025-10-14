@@ -76,6 +76,12 @@ const PromptStudio = () => {
     if (targetDoc) {
       // 从 _source_texts 中获取该列对应的原文
       let highlightText = record[columnKey]; // 默认使用单元格值
+      let isNoneValue = false; // 标识是否为 None 值
+      
+      // 检查单元格值是否为 None
+      if (!clickedValue || clickedValue === 'None' || clickedValue === 'null' || clickedValue === '') {
+        isNoneValue = true;
+      }
       
       // 如果有 _source_texts 数据，使用原文
       const sourceKey = `_source_${columnKey}`;
@@ -89,7 +95,7 @@ const PromptStudio = () => {
       
       if (window.triggerDocumentPreview) {
         //console.log('Triggering document preview with source text');
-        window.triggerDocumentPreview(targetDoc, highlightText);
+        window.triggerDocumentPreview(targetDoc, highlightText, isNoneValue);
       } else {
         console.error('window.triggerDocumentPreview not available');
       }
