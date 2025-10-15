@@ -527,6 +527,32 @@ def build_index():
         
     except Exception as e:
         return jsonify({'error': f'Failed to build index: {str(e)}'}), 500
+    
+
+
+@app.route('/api/delete-index', methods=['DELETE'])
+def delete_index():
+    """删除指定的索引"""
+    try:
+        request_data = request.json
+        if not request_data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        table_name = request_data.get('indexName')
+        if not table_name:
+            return jsonify({'error': 'Missing indexName parameter'}), 400
+        
+        # 调用删除索引的方法
+        fun.delete_table(table_name)
+        
+        return jsonify({
+            'message': f'Index {table_name} deleted successfully',
+            'status': 'success'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete index: {str(e)}'}), 500
+
+
 
 
 # ==================== 项目管理相关接口 ====================
@@ -1477,4 +1503,4 @@ def delete_conversation(filename):
 
 
 if __name__=='__main__':
-    app.run(debug=True, port=5003)
+    app.run(debug=True, port=5005)

@@ -9,7 +9,8 @@ import {
   FolderOpenOutlined,
   DatabaseOutlined,
   SettingOutlined,
-  StopOutlined
+  StopOutlined,
+  DeleteOutlined
 
 } from '@ant-design/icons';
 import { useApiUrl } from '../configContext';
@@ -20,9 +21,10 @@ const { Panel } = Collapse;
 const { Title, Text } = Typography;
 
 // 索引选择模态框组件
-const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, indexDescriptions, loading }) => {
+const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, indexDescriptions, loading, onDelete }) => {
   const [localSelectedIndexes, setLocalSelectedIndexes] = useState([]);
   const [localDescriptions, setLocalDescriptions] = useState({});
+  const [deletingIndex, setDeletingIndex] = useState(null);
 
   // 当模态框打开时，初始化本地选择状态
   useEffect(() => {
@@ -51,6 +53,24 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
       ...prev,
       [indexName]: description
     }));
+  };
+
+  const handleDeleteIndex = async (indexName, e) => {
+    e.stopPropagation();
+    setDeletingIndex(indexName);
+    try {
+      await onDelete(indexName);
+      // 删除成功后，从本地选择中移除该索引
+      setLocalSelectedIndexes(prev => prev.filter(id => id !== indexName));
+      // 同时移除该索引的描述
+      setLocalDescriptions(prev => {
+        const newDescriptions = { ...prev };
+        delete newDescriptions[indexName];
+        return newDescriptions;
+      });
+    } finally {
+      setDeletingIndex(null);
+    }
   };
 
   return (
@@ -93,17 +113,31 @@ const IndexConfigModal = ({ visible, onCancel, onSave, availableIndexes, selecte
               option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
             }
           >
-            {availableIndexes.map((index, i) => (
-              <Option key={typeof index === 'string' ? index : index.id || i} 
-                      value={typeof index === 'string' ? index : index.id}>
-                <div>
-                  <div>{typeof index === 'string' ? index : index.name}</div>
-                  <Text style={{ color: '#666666', fontSize: '12px' }}>
-                    {typeof index === 'string' ? '' : (index.description || '')}
-                  </Text>
-                </div>
-              </Option>
-            ))}
+            {availableIndexes.map((index, i) => {
+              const indexName = typeof index === 'string' ? index : index.id;
+              const isDeleting = deletingIndex === indexName;
+              return (
+                <Option key={indexName || i} value={indexName}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div>{typeof index === 'string' ? index : index.name}</div>
+                      <Text style={{ color: '#666666', fontSize: '12px' }}>
+                        {typeof index === 'string' ? '' : (index.description || '')}
+                      </Text>
+                    </div>
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      loading={isDeleting}
+                      onClick={(e) => handleDeleteIndex(indexName, e)}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </div>
+                </Option>
+              );
+            })}
           </Select>
         </div>
 
@@ -307,10 +341,10 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
     }
   };
 
-  // 组件挂载时获取索引列表
-  useEffect(() => {
-    fetchIndexes();
-  }, []);
+  // 移除组件挂载时获取索引列表的代码，改为点击 Indexes 按钮时获取
+  // useEffect(() => {
+  //   fetchIndexes();
+  // }, []);
 
   // 组件卸载时关闭所有SSE连接
   useEffect(() => {
@@ -736,7 +770,9 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
   }, [conversations, isProcessing]);
 
   // 处理索引配置
-  const handleIndexConfig = () => {
+  const handleIndexConfig = async () => {
+    // 点击 Indexes 按钮时才获取索引列表
+    await fetchIndexes();
     setIndexConfigVisible(true);
   };
 
@@ -755,6 +791,46 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
       })
     });
     message.success(`indexes saved successfully (${selectedIndexIds.length} indexes)`);
+  };
+
+  // 删除索引
+  const handleDeleteIndex = async (indexName) => {
+    try {
+      const response = await fetch(getApiUrl('/api/delete-index'), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          indexName: indexName
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete index');
+      }
+
+      const result = await response.json();
+      message.success(`${indexName} successfully deleted`);
+      
+      // 重新获取索引列表
+      await fetchIndexes();
+      
+      // 如果删除的索引在已选列表中，需要移除
+      setSelectedIndexes(prev => prev.filter(id => id !== indexName));
+      
+      // 同时移除该索引的描述
+      setIndexDescriptions(prev => {
+        const newDescriptions = { ...prev };
+        delete newDescriptions[indexName];
+        return newDescriptions;
+      });
+      
+    } catch (error) {
+      console.error('Failed to delete index:', error);
+      message.error('删除索引失败: ' + error.message);
+      throw error; // 重新抛出错误，让调用方知道失败了
+    }
   };
 
 
@@ -1807,6 +1883,7 @@ const NaturalLanguagePanel = ({ documents, onRowClick, projectInfo }) => {
         selectedIndexes={selectedIndexes}
         indexDescriptions={indexDescriptions}
         loading={loadingIndexes}
+        onDelete={handleDeleteIndex}
       />
     </div>
   );

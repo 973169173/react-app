@@ -57,8 +57,10 @@ const { Title, Text } = Typography;
 // - availableIndexes: 可用索引列表（对象或字符串）
 // - selectedIndexes: 已选索引 id 列表
 // - loading: 加载态
-const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, loading }) => {
+// - onDelete: 删除索引的回调
+const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, selectedIndexes, loading, onDelete }) => {
   const [localSelectedIndexes, setLocalSelectedIndexes] = useState([]);
+  const [deletingIndex, setDeletingIndex] = useState(null);
 
   // 当模态框打开时，初始化本地选择状态
   useEffect(() => {
@@ -79,6 +81,16 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
 
   const handleClearAll = () => {
     setLocalSelectedIndexes([]);
+  };
+
+  const handleDeleteIndex = async (indexName, e) => {
+    e.stopPropagation();
+    setDeletingIndex(indexName);
+    try {
+      await onDelete(indexName);
+    } finally {
+      setDeletingIndex(null);
+    }
   };
 
   return (
@@ -117,17 +129,31 @@ const IndexSelectionModal = ({ visible, onCancel, onSave, availableIndexes, sele
           option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
         }
       >
-        {availableIndexes.map((index, i) => (
-          <Option key={typeof index === 'string' ? index : index.id || i} 
-                  value={typeof index === 'string' ? index : index.id}>
-            <div>
-              <div>{typeof index === 'string' ? index : index.name}</div>
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                {typeof index === 'string' ? '' : (index.description || '')}
-              </Text>
-            </div>
-          </Option>
-        ))}
+        {availableIndexes.map((index, i) => {
+          const indexName = typeof index === 'string' ? index : index.id;
+          const isDeleting = deletingIndex === indexName;
+          return (
+            <Option key={indexName || i} value={indexName}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <div>{typeof index === 'string' ? index : index.name}</div>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    {typeof index === 'string' ? '' : (index.description || '')}
+                  </Text>
+                </div>
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  loading={isDeleting}
+                  onClick={(e) => handleDeleteIndex(indexName, e)}
+                  style={{ marginLeft: 8 }}
+                />
+              </div>
+            </Option>
+          );
+        })}
       </Select>
     </Modal>
   );
@@ -692,7 +718,8 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   const fetchIndexes = useCallback(async () => {
     setLoadingIndexes(true);
     try {
-  const response = await fetch(getApiUrl(`/api/existindex?function_name=${projectInfo?.function_name}`));
+      console.log('Fetching indexes for function_name:', projectInfo?.function_name);
+      const response = await fetch(getApiUrl(`/api/existindex?function_name=${projectInfo?.function_name}`));
       if (!response.ok) {
         throw new Error('Failed to fetch indexes');
       }
@@ -705,12 +732,12 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     } finally {
       setLoadingIndexes(false);
     }
-  }, [message]);
+  }, [projectInfo?.function_name, message, getApiUrl]);
 
-  // 组件挂载时获取索引列表
-  useEffect(() => {
-    fetchIndexes();
-  }, [fetchIndexes]);
+  // 移除组件挂载时获取索引列表的代码，改为点击 Indexes 按钮时获取
+  // useEffect(() => {
+  //   fetchIndexes();
+  // }, [fetchIndexes]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -958,7 +985,9 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
   };
 
   // 处理索引选择
-  const handleSelectIndexes = () => {
+  const handleSelectIndexes = async () => {
+    // 点击 Indexes 按钮时才获取索引列表
+    await fetchIndexes();
     setIndexModalVisible(true);
   };
 
@@ -996,6 +1025,39 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
     } catch (error) {
       console.error('Failed to save index selection:', error);
       message.error('保存索引选择失败');
+    }
+  };
+
+  // 删除索引
+  const handleDeleteIndex = async (indexName) => {
+    try {
+      const response = await fetch(getApiUrl('/api/delete-index'), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          indexName: indexName
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete index');
+      }
+
+      const result = await response.json();
+      message.success(`${indexName} successfully deleted`);
+      
+      // 重新获取索引列表
+      await fetchIndexes();
+      
+      // 如果删除的索引在已选列表中，需要移除
+      setSelectedGlobalIndexes(prev => prev.filter(id => id !== indexName));
+      
+    } catch (error) {
+      console.error('Failed to delete index:', error);
+      message.error('删除索引失败: ' + error.message);
+      throw error; // 重新抛出错误，让调用方知道失败了
     }
   };
 
@@ -1310,7 +1372,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
               <Button 
                 size="small"
                 icon={<DatabaseOutlined />}
-                onClick={() => setIndexModalVisible(true)}
+                onClick={handleSelectIndexes}
               >
                 Indexes
                 {selectedGlobalIndexes.length > 0 && (
@@ -1386,6 +1448,7 @@ const OperatorPanel = ({ documents, onRowClick, showBackButton = false, onBackTo
         availableIndexes={availableIndexes}
         selectedIndexes={selectedGlobalIndexes}
         loading={loadingIndexes}
+        onDelete={handleDeleteIndex}
       />
 
       {/* 结果查看弹窗（最小侵入）：不影响原 Collapse 内联输出，仅作为更易用的查看方式 */}

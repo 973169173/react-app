@@ -22,5 +22,17 @@
     "updatedAt": "2025-09-28 19:05:33",
     "status": "active",
     "created_by": "system"
+  },
+  {
+    "id": "2f86ba1e-1eda-4746-b696-ffedf1739ab4",
+    "name": "auo",
+    "function_name": "oLpaXyemrNauo",
+    "new_function_name": "oLpaXyemrNauo",
+    "description": "和",
+    "index_name": "",
+    "createdAt": "2025-10-15 20:19:14",
+    "updatedAt": "2025-10-15 20:19:14",
+    "status": "active",
+    "created_by": "system"
   }
 ]
