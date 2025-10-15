@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/yuxinjiang/quest')  # 添加 quest 的父目录到 sys.path
+sys.path.append('/data/guyang/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/data/guyang/quest')  # 将内层 quest 设为包根
 #sys.path.append('/home/lijianhui/workspace/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/home/lijianhui/workspace/quest/quest')  # 将内层 quest 设为包根
@@ -51,6 +51,16 @@ for folder in [UPLOAD_FOLDER, DATA_FOLDER, PROJECTS_FOLDER]:
 
 from quest.backend.interface.operation import OperationImplementation
 from quest.backend.interface.operation import OperationImplementation
+try:
+    from quest.sql.func.func import FuncObject
+    from quest.db.indexer.indexer import GlobalIndexer
+except Exception as _img_imp_err:
+    FuncObject = None
+    GlobalIndexer = None
+    try:
+        app.logger.warning(f"[WARN] figure extraction imports failed: {_img_imp_err}")
+    except Exception:
+        print('[WARN] figure extraction imports failed:', _img_imp_err)
 
 fun = OperationImplementation()
 fun1=NLImplementation()
@@ -144,30 +154,87 @@ def extract_data():
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
     prompt,mode,tablename,columnname,columns_prompt=parameters.get('prompt',''),parameters.get('mode',''),parameters.get('tablename',''),parameters.get('column_name',''),parameters.get('columns_prompt','')
     print(type,prompt,model,parameters)
-    fun_info = {}
+    fo_name = ""
     if(mode == 'basic'):
-        fun_info=fun.extract_text(foname,tablename,columnname,columns_prompt)
+        # OperationImplementation.extract_text now returns a dict: {'foname': new_name, 'time': used_time, 'token': used_token}
+        # Keep backward compatibility if it still returns a plain string.
+        ret = fun.extract_text(foname, tablename, columnname, columns_prompt)
+        time_used = None
+        token_used = None
+        if isinstance(ret, dict):
+            fo_name = ret.get('foname') or ret.get('fo_name') or ret.get('function_name') or ""
+            time_used = ret.get('time')
+            token_used = ret.get('token')
+        else:
+            fo_name = ret
     elif(mode == 'semantic'):
-        fun_info=fun.extract_text_semantic(foname,tablename,columns_prompt)
-    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
-    return jsonify({
-        'function_info':fun_info,
-        'table':df.to_dict(orient="split")})
-    
+        fo_name=fun.extract_text_semantic(foname,tablename,columns_prompt)
+    # Safety: ensure we actually have a string fo_name
+    if not isinstance(fo_name, str) or not fo_name:
+        return jsonify({'error': 'extract_text returned invalid function name'}), 500
+    df = fun.show_table_with_source(fo_name, tablename)
+
+    # ============= Inline figure extraction integration =============
+    # Always attempt to enrich with a hidden _figure column if an image index with same name as tablename exists.
+    # Requirements:
+    #  - Must not break existing text extraction if figure extraction fails
+    #  - Hidden column (prefixed with '_') so current front-end column filtering keeps it invisible
+    #  - Row alignment: rely on order. If lengths mismatch, discard to avoid incorrect pairing.
+    try:
+        if ' _figure' not in df.columns and tablename:  # guard: avoid duplicate
+            # Only proceed if backend figure deps imported
+            if FuncObject is not None and GlobalIndexer is not None:
+                gidx = GlobalIndexer()
+                existing = gidx.get_indexer(tablename)
+                if existing and existing[0]:
+                    fo_img = FuncObject()
+                    fo_img.add_global_source(gidx)
+                    fo_img.add_source(existing[0], tablename, tablename)
+                    # Use a generic question; could be parameterized later
+                    question = f'figure: auto extract figure for row overview'
+                    try:
+                        fo_img.extract_photo(tablename, question)
+                        fig_df = fo_img.show_table(tablename)
+                        # Expect a column named 'figure'
+                        if 'figure' in fig_df.columns:
+                            figures = list(fig_df['figure'])
+                            if len(figures) == len(df):
+                                df.insert(len(df.columns), '_figure', figures)
+                            else:
+                                # Length mismatch: skip to avoid misaligned images
+                                pass
+                    except Exception as _fe:
+                        # Swallow individual figure extraction errors to keep original response
+                        app.logger.warning(f"[figure-extract-inline] failed: {_fe}")
+            else:
+                app.logger.debug('[figure-extract-inline] figure dependencies not available, skip')
+    except Exception as _outer_fe:
+        app.logger.warning(f'[figure-extract-inline] unexpected error: {_outer_fe}')
+
+    resp = {
+        'function_name': fo_name,
+        'table': df.to_dict(orient="split")
+    }
+    # Include optional metrics if present (only for basic mode currently)
+    if mode == 'basic':
+        if 'time_used' in locals() and time_used is not None:
+            resp['time'] = time_used
+        if 'token_used' in locals() and token_used is not None:
+            resp['token'] = token_used
+    return jsonify(resp)
 
 @app.route('/api/filter', methods=['POST'])
 def filter():
     type,model,parameters,foname=request.json.get('type'),request.json.get('model'),request.json.get('parameters'),request.json.get('function_name')
     tablename,condition,columnname,columns_prompt,mode,prompt=parameters.get('tablename',''),parameters.get('condition',''),parameters.get('column_name',''),parameters.get('columns_prompt',''),parameters.get('mode',''),parameters.get('prompt','')
     print(type,prompt,model,parameters)
-    fun_info = {}
     if(mode == 'basic'):
-        fun_info =fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
+        fo_name=fun.filter_text(foname,tablename,columnname,condition,columns_prompt)
     elif(mode == 'semantic'):
-        fun_info=fun.filter_text_semantic(foname,tablename,prompt)
-    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
+        fo_name=fun.filter_text_semantic(foname,tablename,prompt)
+    df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
-        'function_info':fun_info,
+        'function_name':fo_name,
         'table':df.to_dict(orient="split")})
 
 @app.route('/api/retrieve', methods=['POST'])
@@ -179,13 +246,80 @@ def retrieve():
     print(type,prompt,model,parameters)
     indexer_name_list = fun.get_database_indexer_name_list()  # Modify
     print("indexer: ", indexer_name_list)
-    fun_info = {}
+
     foname = fun.add_indexer_list(foname, indexer_name_list, indexer_name_list)
-    fun_info=fun.retrieve_text(foname,tablename,columnname,prompt)
-    df=fun.show_table_with_source(fun_info.get("foname"),tablename)
+    fo_name=fun.retrieve_text(foname,tablename,columnname,prompt)
+    df=fun.show_table_with_source(fo_name,tablename)
     return jsonify({
-        'function_info':fun_info,
+        'function_name':fo_name,
         'table':df.to_dict(orient="split")})
+
+
+@app.route('/api/figure-extract', methods=['POST'])
+def figure_extract():
+    """提取带图片的表格数据，并返回 base64 图片列供前端悬浮显示。
+
+    请求 JSON:
+      indexer_name: 已存在的图片索引名称 (必填，如 test_figure.py 中的 fig_test)
+      question: 问题提示语 (可选，默认 'What is in the occupation of the person in the photo?')
+      table_name: 返回使用的逻辑表名 (可选，默认 indexer_name)
+      build_if_missing: bool, 若索引不存在是否尝试构建 (默认 False)
+      doc_dir: 当需要构建索引时使用的目录 (可选)
+
+    返回 JSON:
+      { function_name, table: {columns,data,index} }
+
+    注意: 返回的图片列名为 figure (与 test_figure.py 保持一致)。
+    前端应当为该列的每行值补上 data:image/...;base64, 前缀后再展示。
+    """
+    try:
+        body = request.get_json(silent=True) or {}
+        indexer_name = (body.get('indexer_name') or '').strip()
+        question = body.get('question') or 'What is in the occupation of the person in the photo?'
+        table_name = body.get('table_name') or indexer_name or 'figure_table'
+        build_if_missing = bool(body.get('build_if_missing', False))
+        doc_dir = body.get('doc_dir')
+        if not indexer_name:
+            return jsonify({'error': 'missing indexer_name'}), 400
+
+        if FuncObject is None or GlobalIndexer is None:
+            return jsonify({'error': 'figure extraction dependencies not available on server'}), 500
+
+        # 初始化全局索引器
+        gidx = GlobalIndexer()
+        existing = gidx.get_indexer(indexer_name)
+        if (not existing or not existing[0]) and build_if_missing:
+            if not doc_dir or not os.path.isdir(doc_dir):
+                return jsonify({'error': 'index not found and invalid doc_dir to build'}), 400
+            # 尝试构建索引 (类型名称按 test_figure.py 示例: FigureDoc)
+            try:
+                fun.build_indexer_with_name_set(doc_dir, indexer_name, 'FigureDoc', name_set=None)
+            except Exception as build_e:
+                return jsonify({'error': f'failed to build index: {build_e}'}), 500
+            existing = gidx.get_indexer(indexer_name)
+        if not existing or not existing[0]:
+            return jsonify({'error': f'indexer {indexer_name} not found'}), 404
+
+        fo = FuncObject()
+        fo.add_global_source(gidx)
+        fo.add_source(existing[0], indexer_name, indexer_name)
+        # 调用图片抽取
+        fo.extract_photo(indexer_name, f'figure: {question}')
+        df = fo.show_table(indexer_name)
+
+        # 为了统一前端展示格式，添加 source 列（与 show_table_with_source 一致风格）
+        if 'source' not in df.columns:
+            # 构造一个简单来源列；真实逻辑可在后续扩展
+            df.insert(0, 'source', indexer_name)
+
+        return jsonify({
+            'function_name': fo.name if hasattr(fo, 'name') else 'figure_extract',
+            'table': df.to_dict(orient='split')
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'figure extraction failed: {e}'}), 500
 
 
 @app.route('/api/nl-parse-start', methods=['POST'])
@@ -473,14 +607,6 @@ def nl():
     print(type(query), query)
     print(type(desc), desc)
     df=fun.solve_agent(table,query,desc)
-    # data={
-    #     'doc':['Aaron_Williams.txt','1111111','222222222'],
-    #     'age':['30','12','212'],
-    #     'name':['Aaron Williams','121','121'],
-    #     '_source_age':['Aaron Williams (born October 2, 1971) is an American former professional basketball player who played fourteen seasons in the National Basketball Association (NBA). He played at the power forward and center positions.','121','121'],
-    #     '_source_name':['In 2000-01, as a member of the New Jersey Nets, Williams posted his best numbers as a pro, playing all 82 games while averaging 10.1 points and 7.2 rebounds per game, but also had the dubious distinction of leading the league in total personal fouls committed, with 319 (an average of 3.89 fouls per game).','111','111']
-    # }
-    # df=pd.DataFrame(data)
     return jsonify(df.to_dict(orient="split"))
 
 
@@ -528,6 +654,32 @@ def build_index():
     except Exception as e:
         return jsonify({'error': f'Failed to build index: {str(e)}'}), 500
     
+
+
+@app.route('/api/delete-index', methods=['DELETE'])
+def delete_index():
+    """删除指定的索引"""
+    try:
+        request_data = request.json
+        if not request_data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        table_name = request_data.get('indexName')
+        if not table_name:
+            return jsonify({'error': 'Missing indexName parameter'}), 400
+        
+        # 调用删除索引的方法
+        fun.delete_table(table_name)
+        
+        return jsonify({
+            'message': f'Index {table_name} deleted successfully',
+            'status': 'success'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete index: {str(e)}'}), 500
+
+
+
 
 
 @app.route('/api/delete-index', methods=['DELETE'])
