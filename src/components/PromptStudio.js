@@ -157,7 +157,7 @@ const PromptStudio = () => {
       <Sider width={250} className="sidebar">
         <div className="logo">
           <Title level={4} style={{ color: 'white', margin: '16px' }}>
-            Unstract
+            Doctopus
           </Title>
         </div>
         <Menu

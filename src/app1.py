@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/data/guyang/quest')  # 添加 quest 的父目录到 sys.path
+sys.path.append('/home/yuxinjiang/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/data/guyang/quest')  # 将内层 quest 设为包根
 #sys.path.append('/home/lijianhui/workspace/quest')  # 添加 quest 的父目录到 sys.path
 #sys.path.insert(0, '/home/lijianhui/workspace/quest/quest')  # 将内层 quest 设为包根
@@ -682,27 +682,7 @@ def delete_index():
 
 
 
-@app.route('/api/delete-index', methods=['DELETE'])
-def delete_index():
-    """删除指定的索引"""
-    try:
-        request_data = request.json
-        if not request_data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        table_name = request_data.get('indexName')
-        if not table_name:
-            return jsonify({'error': 'Missing indexName parameter'}), 400
-        
-        # 调用删除索引的方法
-        fun.delete_table(table_name)
-        
-        return jsonify({
-            'message': f'Index {table_name} deleted successfully',
-            'status': 'success'
-        })
-    except Exception as e:
-        return jsonify({'error': f'Failed to delete index: {str(e)}'}), 500
+
 
 
 

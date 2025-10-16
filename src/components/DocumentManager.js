@@ -33,6 +33,7 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   const [indexName, setIndexName] = useState('');
   const [selectedFoldersForIndex, setSelectedFoldersForIndex] = useState([]);
   const [availableDocumentsForIndex, setAvailableDocumentsForIndex] = useState([]);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null); // 用于存储PDF的blob URL
   
   // 新增状态用于文件夹管理
   const [expandedFolders, setExpandedFolders] = useState([]);
@@ -124,29 +125,32 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
   }, [scrollTrigger]);
 
   const handlePreview = async (document, highlight = null) => {
-    if (document.type.includes('pdf') || document.name.toLowerCase().endsWith('.pdf')) {
-      // 对于PDF文件，从服务器下载并打开
+    // 如果是PDF文件，先下载并创建blob URL
+    if (document.type?.includes('pdf') || document.name?.toLowerCase().endsWith('.pdf')) {
       try {
-  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
+        const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
         if (response.ok) {
           const blob = await response.blob();
           const fileURL = URL.createObjectURL(blob);
-          window.open(fileURL, '_blank');
+          setPdfBlobUrl(fileURL);
         } else {
-          message.error('PDF file preview failed');
+          message.error('PDF file loading failed');
+          return;
         }
       } catch (error) {
-        message.error('PDF file preview failed');
+        message.error('PDF file loading failed');
+        console.error('PDF load error:', error);
+        return;
       }
     } else {
-      // 对于文本文件，在模态框中显示
-      setPreviewDocument(document);
-      setHighlightText(highlight);
-      setPreviewVisible(true);
+      setPdfBlobUrl(null); // 清除之前的PDF URL
     }
-  };
-
-  const handleCustomUpload = async ({ file, fileList }) => {
+    
+    // 统一在模态框中显示所有文件类型
+    setPreviewDocument(document);
+    setHighlightText(highlight);
+    setPreviewVisible(true);
+  };  const handleCustomUpload = async ({ file, fileList }) => {
     if (!file) return;
 
     setUploading(true);
@@ -259,15 +263,15 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
     }
   };
 
-  const handleDownload = async (document) => {
+  const handleDownload = async (doc) => {
     try {
-  const response = await fetch(getApiUrl(`/api/documents/${document.filename}/download`));
+  const response = await fetch(getApiUrl(`/api/documents/${doc.filename}/download`));
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = window.document.createElement('a');
         a.href = url;
-        a.download = document.name;
+        a.download = doc.name;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -706,6 +710,11 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
           setPreviewVisible(false);
           setHighlightText(null);
           setIsNoneValue(false);
+          // 清理blob URL
+          if (pdfBlobUrl) {
+            URL.revokeObjectURL(pdfBlobUrl);
+            setPdfBlobUrl(null);
+          }
         }}
         width={800}
         footer={[
@@ -716,6 +725,11 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
             setPreviewVisible(false);
             setHighlightText(null);
             setIsNoneValue(false);
+            // 清理blob URL
+            if (pdfBlobUrl) {
+              URL.revokeObjectURL(pdfBlobUrl);
+              setPdfBlobUrl(null);
+            }
           }}>
             Close
           </Button>
@@ -725,17 +739,33 @@ const DocumentManager = ({ documents, onDocumentAdd, onDocumentDelete, onDocumen
           <div style={{ 
             height: '500px', 
             overflow: 'auto', 
-            padding: '16px',
+            padding: previewDocument.type?.includes('pdf') || previewDocument.name?.toLowerCase().endsWith('.pdf') ? '0' : '16px',
             background: '#fafafa',
             border: '1px solid #d9d9d9',
             borderRadius: '4px'
           }}>
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: '1.6' }}>
-              {highlightText ? 
-                highlightContent(previewDocument.content || 'Unable to display file content', highlightText, isNoneValue) :
-                (previewDocument.content || 'Unable to display file content')
-              }
-            </div>
+            {(previewDocument.type?.includes('pdf') || previewDocument.name?.toLowerCase().endsWith('.pdf')) ? (
+              // PDF 文件使用 iframe 预览，使用 blob URL
+              pdfBlobUrl ? (
+                <iframe
+                  src={pdfBlobUrl}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  title="PDF Preview"
+                />
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Text type="secondary">Loading PDF...</Text>
+                </div>
+              )
+            ) : (
+              // 文本文件使用原来的方式预览
+              <div style={{ whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: '1.6' }}>
+                {highlightText ? 
+                  highlightContent(previewDocument.content || 'Unable to display file content', highlightText, isNoneValue) :
+                  (previewDocument.content || 'Unable to display file content')
+                }
+              </div>
+            )}
           </div>
         )}
       </Modal>
